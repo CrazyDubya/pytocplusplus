@@ -1043,6 +1043,10 @@ namespace pytocpp {
                     obj = self._translate_expression(node.func.value.value, local_vars)
                     args = [self._translate_expression(arg, local_vars) for arg in node.args]
                     return f"{obj}.push_back({', '.join(args)})"
+                elif func_name in ['sqrt', 'sin', 'cos']:
+                    # math functions imported directly
+                    args = [self._translate_expression(arg, local_vars) for arg in node.args]
+                    return f"std::{func_name}({', '.join(args)})"
                 else:
                     # Regular function call
                     args = [self._translate_expression(arg, local_vars) for arg in node.args]
@@ -1057,6 +1061,9 @@ namespace pytocpp {
                     method = 'push_back'  # std::vector uses push_back, not append
                 
                 args = [self._translate_expression(arg, local_vars) for arg in node.args]
+                # Map math module functions to std:: equivalents
+                if obj == 'math' and method in ['sqrt', 'sin', 'cos']:
+                    return f"std::{method}({', '.join(args)})"
                 return f"{obj}.{method}({', '.join(args)})"
             else:
                 # Fallback for other callable expressions

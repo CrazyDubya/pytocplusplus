@@ -86,7 +86,7 @@ class CodeGenerator:
         with open(output_dir / "setup.py", "w") as f:
             f.write('\n'.join(setup_content))
     
-    def _generate_header(self, analysis_result: Dict) -> str:
+    def _generate_header(self, analysis_result: AnalysisResult) -> str:
         """Generate C++ header file."""
         header = """#pragma once
 
@@ -104,7 +104,7 @@ namespace pytocpp {
 
 """
         # Add function declarations
-        for func_name, func_info in analysis_result.get('functions', {}).items():
+        for func_name, func_info in analysis_result.type_info.items():
             if func_name.startswith('calculate_'):
                 # Get return type
                 return_type = func_info.get('return_type', 'int')
@@ -118,7 +118,7 @@ namespace pytocpp {
         header += "} // namespace pytocpp\n"
         return header
     
-    def _generate_implementation(self, analysis_result: Dict) -> str:
+    def _generate_implementation(self, analysis_result: AnalysisResult) -> str:
         """Generate C++ implementation file."""
         impl = """#include "generated.hpp"
 #include <vector>
@@ -133,7 +133,7 @@ namespace pytocpp {
 
 """
         # Add function implementations
-        for func_name, func_info in analysis_result.get('functions', {}).items():
+        for func_name, func_info in analysis_result.type_info.items():
             if func_name.startswith('calculate_'):
                 impl += self._generate_function_impl(func_name, func_info)
 

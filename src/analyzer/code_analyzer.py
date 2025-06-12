@@ -95,6 +95,21 @@ class CodeAnalyzer:
     def _infer_variable_type(self, node: ast.Assign) -> None:
         """Infer the type of a variable assignment."""
         # Basic type inference implementation
+        target = node.targets[0]
+
+        # Handle tuple assignments early to avoid attribute errors when
+        # accessing `.id` on a tuple target. This covers patterns like
+        # `a, b = 0, 1` as well as nested tuples.
+        if isinstance(target, ast.Tuple):
+            if isinstance(node.value, ast.Tuple):
+                for t, v in zip(target.elts, node.value.elts):
+                    if isinstance(t, ast.Name):
+                        self.type_info[t.id] = self._infer_expression_type(v)
+            else:
+                for t in target.elts:
+                    if isinstance(t, ast.Name):
+                        self.type_info[t.id] = self._infer_expression_type(node.value)
+            return
         if isinstance(node.value, ast.Constant):
             if isinstance(node.value.value, (int, float)):
                 self.type_info[node.targets[0].id] = 'int' if isinstance(node.value.value, int) else 'double'
