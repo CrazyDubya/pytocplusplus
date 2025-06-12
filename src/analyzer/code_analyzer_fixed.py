@@ -51,14 +51,9 @@ class CodeAnalyzer:
             
             tree = ast.parse(content)
             
-            # Perform various analyses
+            # Perform various analyses in a single traversal
             self._analyze_classes(tree)  # Analyze classes first to detect inheritance
-            self._analyze_types(tree)
-            self._analyze_performance(tree)
-            self._analyze_memory_usage(tree)
-            self._analyze_hot_paths(tree)
-            self._analyze_dependencies(tree)
-            self._analyze_complexity(tree)
+            self._traverse_tree(tree)
             
             return AnalysisResult(
                 type_info=self.type_info,
@@ -202,41 +197,43 @@ class CodeAnalyzer:
                         if class_name in self.type_info and 'attributes' in self.type_info[class_name]:
                             self.type_info[class_name]['attributes'][attr_name] = attr_type
     
-    def _analyze_types(self, tree: ast.AST) -> None:
-        """Analyze and infer types in the code."""
+    def _traverse_tree(self, tree: ast.AST) -> None:
+        """Walk the AST once and delegate analysis to helper methods."""
+        hot_paths: List[List[str]] = []
         for node in ast.walk(tree):
-            if isinstance(node, ast.Assign):
-                self._infer_variable_type(node)
-            elif isinstance(node, ast.FunctionDef) and not self.current_class:
-                # Only analyze standalone functions here, class methods are handled separately
-                self._infer_function_types(node)
-    
-    def _analyze_performance(self, tree: ast.AST) -> None:
-        """Identify performance bottlenecks."""
-        for node in ast.walk(tree):
-            if isinstance(node, ast.For):
-                self._check_loop_performance(node)
-            elif isinstance(node, ast.Call):
-                self._check_function_call_performance(node)
-    
-    def _analyze_memory_usage(self, tree: ast.AST) -> None:
-        """Analyze memory usage patterns."""
-        for node in ast.walk(tree):
-            if isinstance(node, ast.List):
-                self._analyze_list_memory(node)
-            elif isinstance(node, ast.Dict):
-                self._analyze_dict_memory(node)
-    
-    def _analyze_hot_paths(self, tree: ast.AST) -> None:
-        """Identify frequently executed code paths."""
-        # Basic implementation that marks loops and conditionals
-        hot_paths = []
-        for node in ast.walk(tree):
-            if isinstance(node, (ast.For, ast.While)):
-                if hasattr(node, 'body') and node.body:
-                    path = [self._get_node_location(stmt) for stmt in node.body]
-                    hot_paths.append(path)
+            self._analyze_types(node)
+            self._analyze_performance(node)
+            self._analyze_memory_usage(node)
+            if isinstance(node, (ast.For, ast.While)) and hasattr(node, 'body') and node.body:
+                path = [self._get_node_location(stmt) for stmt in node.body]
+                hot_paths.append(path)
+            self._analyze_dependencies(node)
+            self._analyze_complexity(node)
         self.hot_paths = hot_paths
+
+    def _analyze_types(self, node: ast.AST) -> None:
+        """Analyze and infer types for a single node."""
+        if isinstance(node, ast.Assign):
+            self._infer_variable_type(node)
+        elif isinstance(node, ast.FunctionDef) and not (node.args.args and node.args.args[0].arg == 'self'):
+            # Only analyze standalone functions here; class methods are handled separately
+            self._infer_function_types(node)
+
+    def _analyze_performance(self, node: ast.AST) -> None:
+        """Identify performance bottlenecks for a single node."""
+        if isinstance(node, ast.For):
+            self._check_loop_performance(node)
+        elif isinstance(node, ast.Call):
+            self._check_function_call_performance(node)
+
+    def _analyze_memory_usage(self, node: ast.AST) -> None:
+        """Analyze memory usage patterns for a single node."""
+        if isinstance(node, ast.List):
+            self._analyze_list_memory(node)
+        elif isinstance(node, ast.Dict):
+            self._analyze_dict_memory(node)
+    
+    # _analyze_hot_paths merged into _traverse_tree
     
     def _get_node_location(self, node: ast.AST) -> str:
         """Get a string representation of a node's location."""
@@ -244,19 +241,17 @@ class CodeAnalyzer:
             return f"line_{node.lineno}"
         return "unknown_location"
     
-    def _analyze_dependencies(self, tree: ast.AST) -> None:
+    def _analyze_dependencies(self, node: ast.AST) -> None:
         """Build dependency graph of the code."""
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                self._add_import_dependency(node)
-            elif isinstance(node, ast.ImportFrom):
-                self._add_import_from_dependency(node)
+        if isinstance(node, ast.Import):
+            self._add_import_dependency(node)
+        elif isinstance(node, ast.ImportFrom):
+            self._add_import_from_dependency(node)
     
-    def _analyze_complexity(self, tree: ast.AST) -> None:
-        """Calculate code complexity metrics."""
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef):
-                self._calculate_function_complexity(node)
+    def _analyze_complexity(self, node: ast.AST) -> None:
+        """Calculate code complexity metrics for a node."""
+        if isinstance(node, ast.FunctionDef):
+            self._calculate_function_complexity(node)
 
     def _store_type_for_target(self, target: ast.AST, type_str: str) -> None:
         """Helper method to safely store type information for a target."""

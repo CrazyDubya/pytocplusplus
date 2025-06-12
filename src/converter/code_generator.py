@@ -103,9 +103,9 @@ class CodeGenerator:
 namespace pytocpp {
 
 """
-        # Add function declarations
-        for func_name, func_info in analysis_result.get('functions', {}).items():
-            if func_name.startswith('calculate_'):
+        # Add function declarations using analyzed type information
+        for func_name, func_info in getattr(analysis_result, 'type_info', {}).items():
+            if isinstance(func_info, dict) and func_name.startswith('calculate_'):
                 # Get return type
                 return_type = func_info.get('return_type', 'int')
                 # Get parameter types
@@ -132,9 +132,9 @@ namespace pytocpp {
 namespace pytocpp {
 
 """
-        # Add function implementations
-        for func_name, func_info in analysis_result.get('functions', {}).items():
-            if func_name.startswith('calculate_'):
+        # Add function implementations using analyzed type information
+        for func_name, func_info in getattr(analysis_result, 'type_info', {}).items():
+            if isinstance(func_info, dict) and func_name.startswith('calculate_'):
                 impl += self._generate_function_impl(func_name, func_info)
 
         impl += "} // namespace pytocpp\n"

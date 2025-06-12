@@ -29,17 +29,12 @@ class CodeAnalyzer:
         """Analyze a Python file and return the results."""
         with open(file_path, 'r') as f:
             content = f.read()
-        
+
         tree = ast.parse(content)
-        
-        # Perform various analyses
-        self._analyze_types(tree)
-        self._analyze_performance(tree)
-        self._analyze_memory_usage(tree)
-        self._analyze_hot_paths(tree)
-        self._analyze_dependencies(tree)
-        self._analyze_complexity(tree)
-        
+
+        # Perform various analyses in a single traversal
+        self._traverse_tree(tree)
+
         return AnalysisResult(
             type_info=self.type_info,
             performance_bottlenecks=self.performance_bottlenecks,
@@ -48,52 +43,111 @@ class CodeAnalyzer:
             dependencies=self.dependencies,
             complexity=self.complexity
         )
-    
-    def _analyze_types(self, tree: ast.AST) -> None:
-        """Analyze and infer types in the code."""
+
+    def _traverse_tree(self, tree: ast.AST) -> None:
+        """Walk the AST once and delegate analysis to helper methods."""
         for node in ast.walk(tree):
-            if isinstance(node, ast.Assign):
-                self._infer_variable_type(node)
-            elif isinstance(node, ast.FunctionDef):
-                self._infer_function_types(node)
-    
-    def _analyze_performance(self, tree: ast.AST) -> None:
-        """Identify performance bottlenecks."""
-        for node in ast.walk(tree):
-            if isinstance(node, ast.For):
-                self._check_loop_performance(node)
-            elif isinstance(node, ast.Call):
-                self._check_function_call_performance(node)
-    
-    def _analyze_memory_usage(self, tree: ast.AST) -> None:
-        """Analyze memory usage patterns."""
-        for node in ast.walk(tree):
-            if isinstance(node, ast.List):
-                self._analyze_list_memory(node)
-            elif isinstance(node, ast.Dict):
-                self._analyze_dict_memory(node)
-    
-    def _analyze_hot_paths(self, tree: ast.AST) -> None:
+            self._analyze_types(node)
+            self._analyze_performance(node)
+            self._analyze_memory_usage(node)
+            self._analyze_hot_paths(node)
+            self._analyze_dependencies(node)
+            self._analyze_complexity(node)
+
+    def _analyze_types(self, node: ast.AST) -> None:
+        """Analyze and infer types for a single node."""
+        if isinstance(node, ast.Assign):
+            self._infer_variable_type(node)
+        elif isinstance(node, ast.FunctionDef):
+            self._infer_function_types(node)
+
+    def _analyze_performance(self, node: ast.AST) -> None:
+        """Identify performance bottlenecks for a single node."""
+        if isinstance(node, ast.For):
+            self._check_loop_performance(node)
+        elif isinstance(node, ast.Call):
+            self._check_function_call_performance(node)
+
+    def _analyze_memory_usage(self, node: ast.AST) -> None:
+        """Analyze memory usage patterns for a single node."""
+        if isinstance(node, ast.List):
+            self._analyze_list_memory(node)
+        elif isinstance(node, ast.Dict):
+            self._analyze_dict_memory(node)
+
+    def _analyze_hot_paths(self, node: ast.AST) -> None:
         """Identify frequently executed code paths."""
         # Implementation will use static analysis and heuristics
         pass
-    
-    def _analyze_dependencies(self, tree: ast.AST) -> None:
+
+    def _analyze_dependencies(self, node: ast.AST) -> None:
         """Build dependency graph of the code."""
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Import):
-                self._add_import_dependency(node)
-            elif isinstance(node, ast.ImportFrom):
-                self._add_import_from_dependency(node)
-    
-    def _analyze_complexity(self, tree: ast.AST) -> None:
-        """Calculate code complexity metrics."""
-        for node in ast.walk(tree):
-            if isinstance(node, ast.FunctionDef):
-                self._calculate_function_complexity(node)
+        if isinstance(node, ast.Import):
+            self._add_import_dependency(node)
+        elif isinstance(node, ast.ImportFrom):
+            self._add_import_from_dependency(node)
+
+    def _analyze_complexity(self, node: ast.AST) -> None:
+        """Calculate code complexity metrics for a node."""
+        if isinstance(node, ast.FunctionDef):
+            self._calculate_function_complexity(node)
     
     def _infer_variable_type(self, node: ast.Assign) -> None:
         """Infer the type of a variable assignment."""
+        # Handle tuple targets (unpacking assignments) early
+        if isinstance(node.targets[0], ast.Tuple):
+            # Move existing tuple unpacking logic here
+            if isinstance(node.value, ast.Call):
+                if isinstance(node.value.func, ast.Name):
+                    func_name = node.value.func.id
+                    if func_name in self.type_info:
+                        return_type = self.type_info[func_name].get('return_type', 'std::tuple<int, int>')
+                        if return_type.startswith('std::tuple<'):
+                            types = return_type[11:-1].split(', ')
+                            for i, target in enumerate(node.targets[0].elts):
+                                if i < len(types):
+                                    if isinstance(target, ast.Tuple):
+                                        nested_types = types[i][11:-1].split(', ')
+                                        for j, nested_target in enumerate(target.elts):
+                                            if j < len(nested_types):
+                                                self.type_info[nested_target.id] = nested_types[j]
+                                            else:
+                                                self.type_info[nested_target.id] = 'int'
+                                    else:
+                                        self.type_info[target.id] = types[i]
+                                else:
+                                    self.type_info[target.id] = 'int'
+                        else:
+                            for target in node.targets[0].elts:
+                                if isinstance(target, ast.Name):
+                                    self.type_info[target.id] = 'int'
+                    else:
+                        for target in node.targets[0].elts:
+                            if isinstance(target, ast.Tuple):
+                                for nested_target in target.elts:
+                                    self.type_info[nested_target.id] = 'int'
+                            elif isinstance(target, ast.Name):
+                                self.type_info[target.id] = 'int'
+            elif isinstance(node.value, ast.Tuple):
+                for i, (target, value) in enumerate(zip(node.targets[0].elts, node.value.elts)):
+                    if isinstance(target, ast.Tuple):
+                        if isinstance(value, ast.Tuple):
+                            for j, (nested_target, nested_value) in enumerate(zip(target.elts, value.elts)):
+                                self.type_info[nested_target.id] = self._infer_expression_type(nested_value)
+                        else:
+                            for nested_target in target.elts:
+                                self.type_info[nested_target.id] = 'int'
+                    else:
+                        self.type_info[target.id] = self._infer_expression_type(value)
+            else:
+                for target in node.targets[0].elts:
+                    if isinstance(target, ast.Tuple):
+                        for nested_target in target.elts:
+                            self.type_info[nested_target.id] = 'int'
+                    else:
+                        self.type_info[target.id] = 'int'
+            return
+
         # Basic type inference implementation
         if isinstance(node.value, ast.Constant):
             if isinstance(node.value.value, (int, float)):
