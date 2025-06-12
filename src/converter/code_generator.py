@@ -1,7 +1,7 @@
 from typing import Dict, List, Any, Optional
 import ast
 from pathlib import Path
-from src.analyzer.code_analyzer import AnalysisResult
+from src.analyzer.code_analyzer_fixed import AnalysisResult
 from src.rules.rule_manager import RuleManager
 import os
 

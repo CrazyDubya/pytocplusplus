@@ -128,8 +128,7 @@ This demonstrates successful translation of:
 pytocplusplus/
 ├── src/
 │   ├── analyzer/           # Python code analysis components
-│   │   ├── code_analyzer.py     # Original analyzer with bug
-│   │   └── code_analyzer_fixed.py  # Fixed implementation
+│   │   └── code_analyzer_fixed.py  # Analyzer implementation
 │   ├── converter/          # C++ conversion components
 │   │   ├── code_generator.py    # Original generator
 │   │   └── code_generator_fixed.py  # Fixed implementation
