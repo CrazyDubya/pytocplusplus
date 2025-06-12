@@ -106,6 +106,9 @@ class CodeGenerator:
 #include <string>
 #include <vector>
 #include <map>
+#include <unordered_map>
+#include <unordered_map>
+#include <unordered_map>
 #include <set>
 #include <tuple>
 #include <optional>
@@ -274,6 +277,7 @@ namespace pytocpp {
         impl = """#include "generated.hpp"
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <tuple>
 #include <optional>
@@ -1104,6 +1108,42 @@ namespace pytocpp {
                 value_type = self._infer_cpp_type(node.values[0], local_vars)
                 
             return f"std::map<{key_type}, {value_type}>{{{', '.join(pairs)}}}"
+        elif isinstance(node, ast.ListComp):
+            gen = node.generators[0]
+            iterable = self._translate_expression(gen.iter, local_vars)
+            target = self._translate_expression(gen.target, local_vars)
+            element_type = self._infer_cpp_type(node.elt, local_vars)
+            elt_expr = self._translate_expression(node.elt, local_vars)
+            conditions = [self._translate_expression(if_cond, local_vars) for if_cond in gen.ifs]
+            cond_str = ' && '.join(conditions) if conditions else None
+            result_lines = ["([&]{", f"    std::vector<{element_type}> result;", f"    result.reserve({iterable}.size());", f"    for (auto {target} : {iterable}) {{"]
+            if cond_str:
+                result_lines.append(f"        if ({cond_str}) {{ result.push_back({elt_expr}); }}")
+            else:
+                result_lines.append(f"        result.push_back({elt_expr});")
+            result_lines.append("    }")
+            result_lines.append("    return result;")
+            result_lines.append("}())")
+            return "\n".join(result_lines)
+        elif isinstance(node, ast.DictComp):
+            gen = node.generators[0]
+            iterable = self._translate_expression(gen.iter, local_vars)
+            target = self._translate_expression(gen.target, local_vars)
+            key_type = self._infer_cpp_type(node.key, local_vars)
+            value_type = self._infer_cpp_type(node.value, local_vars)
+            key_expr = self._translate_expression(node.key, local_vars)
+            value_expr = self._translate_expression(node.value, local_vars)
+            conditions = [self._translate_expression(if_cond, local_vars) for if_cond in gen.ifs]
+            cond_str = ' && '.join(conditions) if conditions else None
+            result_lines = ["([&]{", f"    std::unordered_map<{key_type}, {value_type}> result;", f"    result.reserve({iterable}.size());", f"    for (auto {target} : {iterable}) {{"]
+            if cond_str:
+                result_lines.append(f"        if ({cond_str}) {{ result[{key_expr}] = {value_expr}; }}")
+            else:
+                result_lines.append(f"        result[{key_expr}] = {value_expr};")
+            result_lines.append("    }")
+            result_lines.append("    return result;")
+            result_lines.append("}())")
+            return "\n".join(result_lines)
         elif isinstance(node, ast.Tuple):
             # Handle tuple literals
             elements = [self._translate_expression(elt, local_vars) for elt in node.elts]

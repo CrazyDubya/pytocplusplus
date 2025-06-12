@@ -177,7 +177,7 @@ nested_tuple = ((1, 2), (3, 4))
             assert result.type_info['int_list'] == 'std::vector<int>'
             assert result.type_info['str_list'] == 'std::vector<std::string>'
             
-            assert result.type_info['simple_dict'] == 'std::map<std::string, int>'
+            assert result.type_info['simple_dict'] == 'std::unordered_map<std::string, int>'
             # complex_dict mapping depends on implementation quality
             
             assert result.type_info['int_set'] == 'std::set<int>'

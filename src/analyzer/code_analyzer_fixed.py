@@ -298,9 +298,9 @@ class CodeAnalyzer:
             if node.value.keys and node.value.values:
                 key_type = self._infer_expression_type(node.value.keys[0])
                 value_type = self._infer_expression_type(node.value.values[0])
-                self._store_type_for_target(node.targets[0], f'std::map<{key_type}, {value_type}>')
+                self._store_type_for_target(node.targets[0], f'std::unordered_map<{key_type}, {value_type}>')
             else:
-                self._store_type_for_target(node.targets[0], 'std::map<std::string, int>')  # Default
+                self._store_type_for_target(node.targets[0], 'std::unordered_map<std::string, int>')  # Default
         elif isinstance(node.value, ast.Set):
             # Try to infer set element type
             if node.value.elts:
@@ -352,7 +352,7 @@ class CodeAnalyzer:
                     elif func_name == 'list':
                         self._store_type_for_target(node.targets[0], 'std::vector<int>')
                     elif func_name == 'dict':
-                        self._store_type_for_target(node.targets[0], 'std::map<std::string, int>')
+                        self._store_type_for_target(node.targets[0], 'std::unordered_map<std::string, int>')
                     elif func_name == 'set':
                         self._store_type_for_target(node.targets[0], 'std::set<int>')
                     else:
@@ -478,8 +478,8 @@ class CodeAnalyzer:
             if node.keys and node.values:
                 key_type = self._infer_expression_type(node.keys[0])
                 value_type = self._infer_expression_type(node.values[0])
-                return f'std::map<{key_type}, {value_type}>'
-            return 'std::map<std::string, int>'
+                return f'std::unordered_map<{key_type}, {value_type}>'
+            return 'std::unordered_map<std::string, int>'
         elif isinstance(node, ast.Set):
             if node.elts:
                 elt_type = self._infer_expression_type(node.elts[0])
@@ -542,7 +542,7 @@ class CodeAnalyzer:
                 elif func_name == 'list':
                     return 'std::vector<int>'
                 elif func_name == 'dict':
-                    return 'std::map<std::string, int>'
+                    return 'std::unordered_map<std::string, int>'
                 elif func_name == 'set':
                     return 'std::set<int>'
                 elif func_name == 'tuple':
@@ -566,9 +566,9 @@ class CodeAnalyzer:
                     if isinstance(type_info, str):
                         if type_info.startswith('std::vector<'):
                             return type_info[12:-1]  # Extract T from std::vector<T>
-                        elif type_info.startswith('std::map<'):
-                            # Return value type from std::map<K, V>
-                            parts = type_info[9:-1].split(', ')
+                        elif type_info.startswith('std::unordered_map<'):
+                            # Return value type from std::unordered_map<K, V>
+                            parts = type_info[18:-1].split(', ')
                             if len(parts) > 1:
                                 return parts[1]
                         elif type_info.startswith('std::tuple<'):
@@ -581,9 +581,9 @@ class CodeAnalyzer:
             value_type = self._infer_expression_type(node.value)
             if value_type.startswith('std::vector<'):
                 return value_type[12:-1]  # Extract T from std::vector<T>
-            elif value_type.startswith('std::map<'):
-                # Return value type from std::map<K, V>
-                parts = value_type[9:-1].split(', ')
+            elif value_type.startswith('std::unordered_map<'):
+                # Return value type from std::unordered_map<K, V>
+                parts = value_type[18:-1].split(', ')
                 if len(parts) > 1:
                     return parts[1]
             return 'int'  # Default type
@@ -693,10 +693,10 @@ class CodeAnalyzer:
                     if isinstance(elt, ast.Tuple) and len(elt.elts) >= 2:
                         key_type = self._get_type_name(elt.elts[0])
                         value_type = self._get_type_name(elt.elts[1])
-                        return f'std::map<{key_type}, {value_type}>'
+                        return f'std::unordered_map<{key_type}, {value_type}>'
                     else:
                         # Default if not a proper tuple
-                        return 'std::map<std::string, int>'
+                        return 'std::unordered_map<std::string, int>'
                 elif base_type == 'set' or base_type == 'Set':
                     inner_type = self._get_type_name(elt)
                     return f'std::set<{inner_type}>'

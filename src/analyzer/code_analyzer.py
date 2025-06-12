@@ -94,6 +94,9 @@ class CodeAnalyzer:
     
     def _infer_variable_type(self, node: ast.Assign) -> None:
         """Infer the type of a variable assignment."""
+        if isinstance(node.targets[0], ast.Tuple):
+            self._handle_tuple_target_assignment(node)
+            return
         # Basic type inference implementation
         if isinstance(node.value, ast.Constant):
             if isinstance(node.value.value, (int, float)):
@@ -209,6 +212,67 @@ class CodeAnalyzer:
                             self.type_info[nested_target.id] = 'int'
                     else:
                         self.type_info[target.id] = 'int'
+
+    def _handle_tuple_target_assignment(self, node: ast.Assign) -> None:
+        """Handle tuple unpacking in assignments."""
+        target_tuple = node.targets[0]
+
+        if isinstance(node.value, ast.Call):
+            if isinstance(node.value.func, ast.Name):
+                func_name = node.value.func.id
+                if func_name in self.type_info:
+                    return_type = self.type_info[func_name].get('return_type', None)
+                    if return_type and isinstance(return_type, str) and return_type.startswith('std::tuple<'):
+                        types = return_type[11:-1].split(', ')
+                        for i, target in enumerate(target_tuple.elts):
+                            if i < len(types):
+                                if isinstance(target, ast.Tuple):
+                                    if types[i].startswith('std::tuple<'):
+                                        nested_types = types[i][11:-1].split(', ')
+                                        for j, nested_target in enumerate(target.elts):
+                                            if j < len(nested_types) and isinstance(nested_target, ast.Name):
+                                                self.type_info[nested_target.id] = nested_types[j]
+                                            elif isinstance(nested_target, ast.Name):
+                                                self.type_info[nested_target.id] = 'int'
+                                    else:
+                                        for nested_target in target.elts:
+                                            if isinstance(nested_target, ast.Name):
+                                                self.type_info[nested_target.id] = 'int'
+                                elif isinstance(target, ast.Name):
+                                    self.type_info[target.id] = types[i]
+                            elif isinstance(target, ast.Name):
+                                self.type_info[target.id] = 'int'
+                    else:
+                        self._assign_default_types_to_tuple(target_tuple)
+                else:
+                    self._assign_default_types_to_tuple(target_tuple)
+            else:
+                self._assign_default_types_to_tuple(target_tuple)
+        elif isinstance(node.value, ast.Tuple):
+            for target, value in zip(target_tuple.elts, node.value.elts):
+                if isinstance(target, ast.Tuple):
+                    if isinstance(value, ast.Tuple):
+                        for nested_target, nested_value in zip(target.elts, value.elts):
+                            if isinstance(nested_target, ast.Name):
+                                self.type_info[nested_target.id] = self._infer_expression_type(nested_value)
+                    else:
+                        for nested_target in target.elts:
+                            if isinstance(nested_target, ast.Name):
+                                self.type_info[nested_target.id] = 'int'
+                elif isinstance(target, ast.Name):
+                    self.type_info[target.id] = self._infer_expression_type(value)
+        else:
+            self._assign_default_types_to_tuple(target_tuple)
+
+    def _assign_default_types_to_tuple(self, target_tuple: ast.Tuple) -> None:
+        """Assign default types to all elements in a tuple unpacking."""
+        for target in target_tuple.elts:
+            if isinstance(target, ast.Tuple):
+                for nested_target in target.elts:
+                    if isinstance(nested_target, ast.Name):
+                        self.type_info[nested_target.id] = 'int'
+            elif isinstance(target, ast.Name):
+                self.type_info[target.id] = 'int'
 
     def _infer_expression_type(self, node: ast.AST) -> str:
         """Infer the type of an expression."""
