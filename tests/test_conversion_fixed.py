@@ -1,5 +1,7 @@
 import pytest
 from pathlib import Path
+import tempfile
+import os
 from src.analyzer.code_analyzer_fixed import CodeAnalyzer
 from src.rules.rule_manager import RuleManager
 from src.rules.basic_rules import (
@@ -57,3 +59,39 @@ def test_fibonacci_conversion(tmp_path):
     cmake_content = (output_dir / "CMakeLists.txt").read_text()
     assert "cmake_minimum_required" in cmake_content
     assert "project(pytocpp_generated)" in cmake_content
+
+
+def test_set_comprehension_translation(tmp_path):
+    analyzer = CodeAnalyzer()
+    rule_manager = RuleManager()
+
+    rule_manager.register_rule(VariableDeclarationRule())
+    rule_manager.register_rule(FunctionDefinitionRule())
+    rule_manager.register_rule(ClassDefinitionRule())
+
+    generator = CodeGenerator(rule_manager)
+
+    with tempfile.NamedTemporaryFile("w", suffix=".py", delete=False) as temp:
+        temp.write(
+            "def make_set(n):\n"
+            "    return {i * 2 for i in range(n)}\n"
+        )
+        temp_path = Path(temp.name)
+
+    try:
+        analysis_result = analyzer.analyze_file(temp_path)
+
+        rule_manager.set_context({
+            'type_info': analysis_result.type_info,
+            'performance_bottlenecks': analysis_result.performance_bottlenecks,
+            'memory_usage': analysis_result.memory_usage,
+            'hot_paths': analysis_result.hot_paths
+        })
+
+        output_dir = tmp_path / "generated_set"
+        generator.generate_code(analysis_result, output_dir)
+
+        impl_content = (output_dir / "generated.cpp").read_text()
+        assert "std::set<int> _set" in impl_content
+    finally:
+        os.unlink(temp_path)

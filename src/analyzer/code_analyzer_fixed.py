@@ -485,6 +485,10 @@ class CodeAnalyzer:
                 elt_type = self._infer_expression_type(node.elts[0])
                 return f'std::set<{elt_type}>'
             return 'std::set<int>'
+        elif isinstance(node, ast.SetComp):
+            # Infer type from the element expression of the comprehension
+            elt_type = self._infer_expression_type(node.elt)
+            return f'std::set<{elt_type}>'
         elif isinstance(node, ast.Tuple):
             if node.elts:
                 elt_types = []

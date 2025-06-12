@@ -1104,6 +1104,28 @@ namespace pytocpp {
                 value_type = self._infer_cpp_type(node.values[0], local_vars)
                 
             return f"std::map<{key_type}, {value_type}>{{{', '.join(pairs)}}}"
+        elif isinstance(node, ast.SetComp):
+            # Translate set comprehension using a lambda that fills a std::set
+            comp = node.generators[0]
+            iter_expr = self._translate_expression(comp.iter, local_vars)
+            target = self._translate_expression(comp.target, local_vars)
+            element_expr = self._translate_expression(node.elt, local_vars)
+            elem_type = self._infer_cpp_type(node.elt, local_vars)
+            conditions = ''
+            if comp.ifs:
+                conds = ' && '.join(f"({self._translate_expression(c, local_vars)})" for c in comp.ifs)
+                conditions = f"if ({conds}) "
+
+            lines = [
+                "[&]() {",
+                f"    std::set<{elem_type}> _set;",
+                f"    for (auto {target} : {iter_expr}) {{",
+                f"        {conditions}_set.insert({element_expr});",
+                "    }",
+                "    return _set;",
+                "}()",
+            ]
+            return "\n".join(lines)
         elif isinstance(node, ast.Tuple):
             # Handle tuple literals
             elements = [self._translate_expression(elt, local_vars) for elt in node.elts]
@@ -1257,6 +1279,15 @@ namespace pytocpp {
                 return f"std::map<{key_type}, {value_type}>"
             else:
                 return "std::map<std::string, int>"
+        elif isinstance(node, ast.Set):
+            if node.elts:
+                element_type = self._infer_cpp_type(node.elts[0], local_vars)
+                return f"std::set<{element_type}>"
+            else:
+                return "std::set<int>"
+        elif isinstance(node, ast.SetComp):
+            element_type = self._infer_cpp_type(node.elt, local_vars)
+            return f"std::set<{element_type}>"
         elif isinstance(node, ast.Tuple):
             if node.elts:
                 element_types = [self._infer_cpp_type(elt, local_vars) for elt in node.elts]
