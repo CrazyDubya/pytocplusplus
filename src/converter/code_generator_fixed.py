@@ -1083,8 +1083,26 @@ namespace pytocpp {
             # Try to infer element type from the first element if available
             if node.elts:
                 element_type = self._infer_cpp_type(node.elts[0], local_vars)
-                
+
             return f"std::vector<{element_type}>{{{', '.join(elements)}}}"
+        elif isinstance(node, ast.ListComp):
+            elt_type = self._infer_cpp_type(node.elt, local_vars)
+            target = self._translate_expression(node.generators[0].target, local_vars)
+            iterable = self._translate_expression(node.generators[0].iter, local_vars)
+            expr = self._translate_expression(node.elt, local_vars)
+            return (
+                f"([&]() {{ std::vector<{elt_type}> result; for (const auto& {target} : {iterable}) {{ result.push_back({expr}); }} return result; }})()"
+            )
+        elif isinstance(node, ast.DictComp):
+            key_type = self._infer_cpp_type(node.key, local_vars)
+            value_type = self._infer_cpp_type(node.value, local_vars)
+            target = self._translate_expression(node.generators[0].target, local_vars)
+            iterable = self._translate_expression(node.generators[0].iter, local_vars)
+            key_expr = self._translate_expression(node.key, local_vars)
+            value_expr = self._translate_expression(node.value, local_vars)
+            return (
+                f"([&]() {{ std::map<{key_type}, {value_type}> result; for (const auto& {target} : {iterable}) {{ result[{key_expr}] = {value_expr}; }} return result; }})()"
+            )
         elif isinstance(node, ast.Dict):
             # Handle dict literals
             if not node.keys:

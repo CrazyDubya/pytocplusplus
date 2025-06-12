@@ -86,7 +86,7 @@ class CodeGenerator:
         with open(output_dir / "setup.py", "w") as f:
             f.write('\n'.join(setup_content))
     
-    def _generate_header(self, analysis_result: Dict) -> str:
+    def _generate_header(self, analysis_result: AnalysisResult) -> str:
         """Generate C++ header file."""
         header = """#pragma once
 
@@ -103,22 +103,29 @@ class CodeGenerator:
 namespace pytocpp {
 
 """
+        type_info = analysis_result.type_info if hasattr(
+            analysis_result, "type_info"
+        ) else analysis_result.get("functions", {})
+
         # Add function declarations
-        for func_name, func_info in analysis_result.get('functions', {}).items():
+        for func_name, func_info in type_info.items():
             if func_name.startswith('calculate_'):
                 # Get return type
-                return_type = func_info.get('return_type', 'int')
+                return_type = (
+                    func_info.get('return_type', 'int') if isinstance(func_info, dict) else 'int'
+                )
                 # Get parameter types
                 params = []
-                for param_name, param_type in func_info.get('params', {}).items():
-                    params.append(f"{param_type} {param_name}")
+                if isinstance(func_info, dict):
+                    for param_name, param_type in func_info.get('params', {}).items():
+                        params.append(f"{param_type} {param_name}")
                 # Add function declaration
                 header += f"    {return_type} {func_name}({', '.join(params)});\n\n"
 
         header += "} // namespace pytocpp\n"
         return header
     
-    def _generate_implementation(self, analysis_result: Dict) -> str:
+    def _generate_implementation(self, analysis_result: AnalysisResult) -> str:
         """Generate C++ implementation file."""
         impl = """#include "generated.hpp"
 #include <vector>
@@ -132,8 +139,12 @@ namespace pytocpp {
 namespace pytocpp {
 
 """
+        type_info = analysis_result.type_info if hasattr(
+            analysis_result, "type_info"
+        ) else analysis_result.get("functions", {})
+
         # Add function implementations
-        for func_name, func_info in analysis_result.get('functions', {}).items():
+        for func_name, func_info in type_info.items():
             if func_name.startswith('calculate_'):
                 impl += self._generate_function_impl(func_name, func_info)
 

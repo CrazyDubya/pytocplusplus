@@ -301,6 +301,10 @@ class CodeAnalyzer:
                 self._store_type_for_target(node.targets[0], f'std::map<{key_type}, {value_type}>')
             else:
                 self._store_type_for_target(node.targets[0], 'std::map<std::string, int>')  # Default
+        elif isinstance(node.value, ast.DictComp):
+            key_type = self._infer_expression_type(node.value.key)
+            value_type = self._infer_expression_type(node.value.value)
+            self._store_type_for_target(node.targets[0], f'std::map<{key_type}, {value_type}>')
         elif isinstance(node.value, ast.Set):
             # Try to infer set element type
             if node.value.elts:
@@ -474,6 +478,13 @@ class CodeAnalyzer:
                 elt_type = self._infer_expression_type(node.elts[0])
                 return f'std::vector<{elt_type}>'
             return 'std::vector<int>'
+        elif isinstance(node, ast.ListComp):
+            elt_type = self._infer_expression_type(node.elt)
+            return f'std::vector<{elt_type}>'
+        elif isinstance(node, ast.DictComp):
+            key_type = self._infer_expression_type(node.key)
+            value_type = self._infer_expression_type(node.value)
+            return f'std::map<{key_type}, {value_type}>'
         elif isinstance(node, ast.Dict):
             if node.keys and node.values:
                 key_type = self._infer_expression_type(node.keys[0])

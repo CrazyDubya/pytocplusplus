@@ -66,8 +66,8 @@ The current implementation can only handle a limited subset of Python features:
 | **Method overriding** | ✅ **Complete** | **Proper virtual methods and polymorphism** |
 | Error handling | ⚠️ Minimal | Simple try/except structure |
 | Context managers | ⚠️ Minimal | Basic structure without resource management |
-| List comprehensions | ❌ Missing | Not implemented |
-| Dictionary operations | ⚠️ Partial | Simple creation and access |
+| List comprehensions | ✅ **Implemented** | Vector creation with push_back |
+| Dictionary operations | ⚠️ Partial | Basic creation plus comprehension support |
 | String operations | ✅ **Improved** | Advanced f-string support, concatenation |
 | Regular expressions | ❌ Missing | Not implemented |
 | File I/O | ❌ Missing | Not implemented |
@@ -143,7 +143,7 @@ The current implementation can only handle a limited subset of Python features:
 
 **Prioritized Based on Recent Progress:**
 1. Support for Python standard library mapping to C++ equivalents
-2. Add support for list comprehensions and dictionary comprehensions  
+2. ~~Add support for list comprehensions~~ ✓ **List comprehensions implemented**; add dictionary comprehensions
 3. Implement regular expression pattern translation
 4. Add code generation for file I/O operations
 5. Develop optimized C++ code patterns for common Python idioms

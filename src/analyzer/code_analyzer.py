@@ -141,9 +141,17 @@ class CodeAnalyzer:
                         elt_types.append(f'std::tuple<{", ".join(nested_types)}>')
                     else:
                         elt_types.append(self._infer_expression_type(elt))
-                self.type_info[node.targets[0].id] = f'std::tuple<{", ".join(elt_types)}>'
+                if isinstance(node.targets[0], ast.Name):
+                    self.type_info[node.targets[0].id] = (
+                        f"std::tuple<{', '.join(elt_types)}>"
+                    )
+                elif isinstance(node.targets[0], ast.Tuple):
+                    for tgt, typ in zip(node.targets[0].elts, elt_types):
+                        if isinstance(tgt, ast.Name):
+                            self.type_info[tgt.id] = typ
             else:
-                self.type_info[node.targets[0].id] = 'std::tuple<>'
+                if isinstance(node.targets[0], ast.Name):
+                    self.type_info[node.targets[0].id] = 'std::tuple<>'
         elif isinstance(node.value, ast.Call):
             # Try to infer type from function call
             if isinstance(node.value.func, ast.Name):

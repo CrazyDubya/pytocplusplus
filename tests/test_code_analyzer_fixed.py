@@ -310,6 +310,43 @@ def complex_function(x):
             values=[ast.Constant(value=True), ast.Constant(value=False)]
         )
         assert analyzer._infer_expression_type(bool_op) == 'bool'
+
+        list_comp = ast.ListComp(
+            elt=ast.BinOp(
+                left=ast.Name(id='x', ctx=ast.Load()),
+                op=ast.Mult(),
+                right=ast.Constant(value=2),
+            ),
+            generators=[
+                ast.comprehension(
+                    target=ast.Name(id='x', ctx=ast.Store()),
+                    iter=ast.Name(id='nums', ctx=ast.Load()),
+                    ifs=[],
+                    is_async=0,
+                )
+            ],
+        )
+        analyzer.type_info['nums'] = 'std::vector<int>'
+        assert analyzer._infer_expression_type(list_comp) == 'std::vector<int>'
+
+        dict_comp = ast.DictComp(
+            key=ast.Name(id='x', ctx=ast.Load()),
+            value=ast.BinOp(
+                left=ast.Name(id='x', ctx=ast.Load()),
+                op=ast.Mult(),
+                right=ast.Constant(value=2),
+            ),
+            generators=[
+                ast.comprehension(
+                    target=ast.Name(id='x', ctx=ast.Store()),
+                    iter=ast.Name(id='nums', ctx=ast.Load()),
+                    ifs=[],
+                    is_async=0,
+                )
+            ],
+        )
+        analyzer.type_info['nums'] = 'std::vector<int>'
+        assert analyzer._infer_expression_type(dict_comp) == 'std::map<int, int>'
     
     def test_type_annotation_handling(self):
         """Test handling of Python type annotations."""

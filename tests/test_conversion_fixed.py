@@ -57,3 +57,75 @@ def test_fibonacci_conversion(tmp_path):
     cmake_content = (output_dir / "CMakeLists.txt").read_text()
     assert "cmake_minimum_required" in cmake_content
     assert "project(pytocpp_generated)" in cmake_content
+
+
+def test_list_comprehension_conversion(tmp_path):
+    analyzer = CodeAnalyzer()
+    rule_manager = RuleManager()
+    rule_manager.register_rule(VariableDeclarationRule())
+    rule_manager.register_rule(FunctionDefinitionRule())
+    rule_manager.register_rule(ClassDefinitionRule())
+    generator = CodeGenerator(rule_manager)
+
+    test_file = tmp_path / "list_comp.py"
+    test_file.write_text(
+        """
+from typing import List
+
+def double_nums(nums: List[int]) -> List[int]:
+    return [x * 2 for x in nums]
+"""
+    )
+
+    analysis_result = analyzer.analyze_file(test_file)
+    rule_manager.set_context(
+        {
+            "type_info": analysis_result.type_info,
+            "performance_bottlenecks": analysis_result.performance_bottlenecks,
+            "memory_usage": analysis_result.memory_usage,
+            "hot_paths": analysis_result.hot_paths,
+        }
+    )
+
+    output_dir = tmp_path / "generated"
+    generator.generate_code(analysis_result, output_dir)
+
+    impl_content = (output_dir / "generated.cpp").read_text()
+    assert "std::vector<int>" in impl_content
+    assert "result.push_back" in impl_content
+
+
+def test_dict_comprehension_conversion(tmp_path):
+    analyzer = CodeAnalyzer()
+    rule_manager = RuleManager()
+    rule_manager.register_rule(VariableDeclarationRule())
+    rule_manager.register_rule(FunctionDefinitionRule())
+    rule_manager.register_rule(ClassDefinitionRule())
+    generator = CodeGenerator(rule_manager)
+
+    test_file = tmp_path / "dict_comp.py"
+    test_file.write_text(
+        """
+from typing import List, Dict
+
+def map_double(nums: List[int]) -> Dict[int, int]:
+    return {x: x * 2 for x in nums}
+"""
+    )
+
+    analysis_result = analyzer.analyze_file(test_file)
+    rule_manager.set_context(
+        {
+            "type_info": analysis_result.type_info,
+            "performance_bottlenecks": analysis_result.performance_bottlenecks,
+            "memory_usage": analysis_result.memory_usage,
+            "hot_paths": analysis_result.hot_paths,
+        }
+    )
+
+    output_dir = tmp_path / "generated"
+    generator.generate_code(analysis_result, output_dir)
+
+    impl_content = (output_dir / "generated.cpp").read_text()
+    assert "std::map<int, int>" in impl_content
+    assert "result[" in impl_content
