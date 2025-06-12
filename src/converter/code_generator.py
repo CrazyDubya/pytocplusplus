@@ -88,6 +88,8 @@ class CodeGenerator:
     
     def _generate_header(self, analysis_result: Dict) -> str:
         """Generate C++ header file."""
+        if not isinstance(analysis_result, dict):
+            analysis_result = analysis_result.__dict__
         header = """#pragma once
 
 #include <memory>
@@ -120,6 +122,8 @@ namespace pytocpp {
     
     def _generate_implementation(self, analysis_result: Dict) -> str:
         """Generate C++ implementation file."""
+        if not isinstance(analysis_result, dict):
+            analysis_result = analysis_result.__dict__
         impl = """#include "generated.hpp"
 #include <vector>
 #include <map>

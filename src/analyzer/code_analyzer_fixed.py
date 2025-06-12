@@ -41,11 +41,15 @@ class CodeAnalyzer:
         self.hot_paths: List[List[str]] = []
         self.dependencies = nx.DiGraph()
         self.complexity: Dict[str, int] = {}
+        # Cache mapping id(node) -> inferred C++ type
+        self._expr_type_cache: Dict[int, str] = {}
     
     def analyze_file(self, file_path: Path) -> AnalysisResult:
         """Analyze a Python file and return the results."""
         logger.info(f"Analyzing Python code: {file_path}")
         try:
+            # Clear expression type cache for a fresh analysis run
+            self._expr_type_cache.clear()
             with open(file_path, 'r') as f:
                 content = f.read()
             
@@ -439,52 +443,64 @@ class CodeAnalyzer:
 
     def _infer_expression_type(self, node: ast.AST) -> str:
         """Infer the type of an expression."""
+        cache_key = id(node) if hasattr(node, 'lineno') else None
+        if cache_key is not None and cache_key in self._expr_type_cache:
+            return self._expr_type_cache[cache_key]
+
+        result: str = 'int'
+
         if isinstance(node, ast.Constant):
             if isinstance(node.value, bool):  # Check bool first (bool is a subclass of int)
-                return 'bool'
+                result = 'bool'
             elif isinstance(node.value, int):
-                return 'int'
+                result = 'int'
             elif isinstance(node.value, float):
-                return 'double'
+                result = 'double'
             elif isinstance(node.value, str):
-                return 'std::string'
+                result = 'std::string'
             elif node.value is None:
-                return 'std::nullptr_t'
+                result = 'std::nullptr_t'
         elif isinstance(node, ast.Name):
             # Check if we already know the type of this variable
             if node.id in self.type_info:
                 type_info = self.type_info[node.id]
                 if isinstance(type_info, str):
-                    return type_info
-            
-            # Otherwise infer from common names
-            if node.id == 'int':
-                return 'int'
-            elif node.id == 'float':
-                return 'double'
-            elif node.id == 'str':
-                return 'std::string'
-            elif node.id == 'bool':
-                return 'bool'
-            elif node.id == 'None':
-                return 'std::nullptr_t'
-            return 'int'  # Default to int for unknown variables
+                    result = type_info
+                else:
+                    result = 'int'
+            else:
+                # Otherwise infer from common names
+                if node.id == 'int':
+                    result = 'int'
+                elif node.id == 'float':
+                    result = 'double'
+                elif node.id == 'str':
+                    result = 'std::string'
+                elif node.id == 'bool':
+                    result = 'bool'
+                elif node.id == 'None':
+                    result = 'std::nullptr_t'
+                else:
+                    result = 'int'
         elif isinstance(node, ast.List):
             if node.elts:
                 elt_type = self._infer_expression_type(node.elts[0])
-                return f'std::vector<{elt_type}>'
-            return 'std::vector<int>'
+                result = f'std::vector<{elt_type}>'
+            else:
+                result = 'std::vector<int>'
         elif isinstance(node, ast.Dict):
             if node.keys and node.values:
                 key_type = self._infer_expression_type(node.keys[0])
                 value_type = self._infer_expression_type(node.values[0])
-                return f'std::map<{key_type}, {value_type}>'
-            return 'std::map<std::string, int>'
+                result = f'std::map<{key_type}, {value_type}>'
+            else:
+                result = 'std::map<std::string, int>'
         elif isinstance(node, ast.Set):
             if node.elts:
                 elt_type = self._infer_expression_type(node.elts[0])
-                return f'std::set<{elt_type}>'
-            return 'std::set<int>'
+                result = f'std::set<{elt_type}>'
+            else:
+                result = 'std::set<int>'
         elif isinstance(node, ast.Tuple):
             if node.elts:
                 elt_types = []
@@ -495,32 +511,36 @@ class CodeAnalyzer:
                         elt_types.append(self._get_type_name(elt))
                     else:
                         elt_types.append(self._infer_expression_type(elt))
-                return f'std::tuple<{", ".join(elt_types)}>'
-            return 'std::tuple<>'
+                result = f'std::tuple<{", ".join(elt_types)}>'
+            else:
+                result = 'std::tuple<>'
         elif isinstance(node, ast.BinOp):
             # For binary operations, infer type based on operands
             left_type = self._infer_expression_type(node.left)
             right_type = self._infer_expression_type(node.right)
             # If either operand is double, result is double
             if 'double' in (left_type, right_type):
-                return 'double'
+                result = 'double'
             # If string + string, result is string
-            if left_type == 'std::string' and right_type == 'std::string':
-                return 'std::string'
-            return 'int'
+            elif left_type == 'std::string' and right_type == 'std::string':
+                result = 'std::string'
+            # If string + string, result is string
+            else:
+                result = 'int'
         elif isinstance(node, ast.UnaryOp):
             # Infer type based on operand
             operand_type = self._infer_expression_type(node.operand)
             # For not operator, result is bool
             if isinstance(node.op, ast.Not):
-                return 'bool'
-            return operand_type
+                result = 'bool'
+            else:
+                result = operand_type
         elif isinstance(node, ast.Compare):
             # Compare always returns bool
-            return 'bool'
+            result = 'bool'
         elif isinstance(node, ast.BoolOp):
             # Boolean operations always return bool
-            return 'bool'
+            result = 'bool'
         elif isinstance(node, ast.Call):
             # Try to infer return type from function
             if isinstance(node.func, ast.Name):
@@ -528,34 +548,40 @@ class CodeAnalyzer:
                 if func_name in self.type_info:
                     func_info = self.type_info[func_name]
                     if isinstance(func_info, dict) and 'return_type' in func_info:
-                        return func_info['return_type']
-                
-                # Common built-in functions
-                if func_name == 'int':
-                    return 'int'
-                elif func_name == 'float':
-                    return 'double'
-                elif func_name == 'str':
-                    return 'std::string'
-                elif func_name == 'bool':
-                    return 'bool'
-                elif func_name == 'list':
-                    return 'std::vector<int>'
-                elif func_name == 'dict':
-                    return 'std::map<std::string, int>'
-                elif func_name == 'set':
-                    return 'std::set<int>'
-                elif func_name == 'tuple':
-                    return 'std::tuple<int>'
-                elif func_name == 'sum':
-                    return 'int'
-                elif func_name == 'len':
-                    return 'int'
-                elif func_name == 'min' or func_name == 'max':
-                    if node.args:
-                        return self._infer_expression_type(node.args[0])
-                    return 'int'
-            return 'int'  # Default for unknown functions
+                        result = func_info['return_type']
+                    else:
+                        result = 'int'
+                else:
+                    # Common built-in functions
+                    if func_name == 'int':
+                        result = 'int'
+                    elif func_name == 'float':
+                        result = 'double'
+                    elif func_name == 'str':
+                        result = 'std::string'
+                    elif func_name == 'bool':
+                        result = 'bool'
+                    elif func_name == 'list':
+                        result = 'std::vector<int>'
+                    elif func_name == 'dict':
+                        result = 'std::map<std::string, int>'
+                    elif func_name == 'set':
+                        result = 'std::set<int>'
+                    elif func_name == 'tuple':
+                        result = 'std::tuple<int>'
+                    elif func_name == 'sum':
+                        result = 'int'
+                    elif func_name == 'len':
+                        result = 'int'
+                    elif func_name == 'min' or func_name == 'max':
+                        if node.args:
+                            result = self._infer_expression_type(node.args[0])
+                        else:
+                            result = 'int'
+                    else:
+                        result = 'int'
+            else:
+                result = 'int'
         elif isinstance(node, ast.Subscript):
             # Handle container access
             if isinstance(node.value, ast.Name):
@@ -565,29 +591,39 @@ class CodeAnalyzer:
                     # Extract inner type from container types
                     if isinstance(type_info, str):
                         if type_info.startswith('std::vector<'):
-                            return type_info[12:-1]  # Extract T from std::vector<T>
+                            result = type_info[12:-1]
+                            self._expr_type_cache[id(node)] = result
+                            return result
                         elif type_info.startswith('std::map<'):
-                            # Return value type from std::map<K, V>
                             parts = type_info[9:-1].split(', ')
                             if len(parts) > 1:
-                                return parts[1]
+                                result = parts[1]
+                                self._expr_type_cache[id(node)] = result
+                                return result
                         elif type_info.startswith('std::tuple<'):
-                            # For tuples, would need to know which index is being accessed
-                            # Default to first type for now
                             parts = type_info[11:-1].split(', ')
                             if parts:
-                                return parts[0]
+                                result = parts[0]
+                                self._expr_type_cache[id(node)] = result
+                                return result
             # Try to infer from value type
             value_type = self._infer_expression_type(node.value)
             if value_type.startswith('std::vector<'):
-                return value_type[12:-1]  # Extract T from std::vector<T>
+                result = value_type[12:-1]
             elif value_type.startswith('std::map<'):
-                # Return value type from std::map<K, V>
                 parts = value_type[9:-1].split(', ')
                 if len(parts) > 1:
-                    return parts[1]
-            return 'int'  # Default type
-        return 'int'  # Default type for unknown expressions
+                    result = parts[1]
+                else:
+                    result = 'int'
+            else:
+                result = 'int'
+        else:
+            result = 'int'
+
+        if cache_key is not None:
+            self._expr_type_cache[cache_key] = result
+        return result
 
     def _infer_function_types(self, node: ast.FunctionDef) -> None:
         """Infer function parameter and return types."""

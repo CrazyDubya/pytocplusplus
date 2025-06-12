@@ -24,9 +24,14 @@ class CodeAnalyzer:
         self.hot_paths: List[List[str]] = []
         self.dependencies = nx.DiGraph()
         self.complexity: Dict[str, int] = {}
+        # Cache for expression type inference to avoid redundant work
+        self._expr_type_cache: Dict[int, str] = {}
     
     def analyze_file(self, file_path: Path) -> AnalysisResult:
         """Analyze a Python file and return the results."""
+        # Clear caches for a fresh analysis run
+        self._expr_type_cache.clear()
+
         with open(file_path, 'r') as f:
             content = f.read()
         
@@ -124,8 +129,55 @@ class CodeAnalyzer:
                 self.type_info[node.targets[0].id] = f'std::set<{elt_type}>'
             else:
                 self.type_info[node.targets[0].id] = 'std::set<int>'  # Default
+        elif isinstance(node.targets[0], ast.Tuple):
+            # Handle tuple unpacking assignments
+            if isinstance(node.value, ast.Call):
+                if isinstance(node.value.func, ast.Name):
+                    func_name = node.value.func.id
+                    if func_name in self.type_info:
+                        return_type = self.type_info[func_name].get('return_type', 'std::tuple<int, int>')
+                        if return_type.startswith('std::tuple<'):
+                            types = return_type[11:-1].split(', ')
+                            for i, target in enumerate(node.targets[0].elts):
+                                if i < len(types):
+                                    if isinstance(target, ast.Tuple):
+                                        nested_types = types[i][11:-1].split(',')
+                                        for j, nested_target in enumerate(target.elts):
+                                            if j < len(nested_types):
+                                                self.type_info[nested_target.id] = nested_types[j]
+                                            else:
+                                                self.type_info[nested_target.id] = 'int'
+                                    else:
+                                        self.type_info[target.id] = types[i]
+                                else:
+                                    self.type_info[target.id] = 'int'
+                    else:
+                        for target in node.targets[0].elts:
+                            if isinstance(target, ast.Tuple):
+                                for nested_target in target.elts:
+                                    self.type_info[nested_target.id] = 'int'
+                            else:
+                                self.type_info[target.id] = 'int'
+            elif isinstance(node.value, ast.Tuple):
+                for i, (target, value) in enumerate(zip(node.targets[0].elts, node.value.elts)):
+                    if isinstance(target, ast.Tuple):
+                        if isinstance(value, ast.Tuple):
+                            for j, (nested_target, nested_value) in enumerate(zip(target.elts, value.elts)):
+                                self.type_info[nested_target.id] = self._infer_expression_type(nested_value)
+                        else:
+                            for nested_target in target.elts:
+                                self.type_info[nested_target.id] = 'int'
+                    else:
+                        self.type_info[target.id] = self._infer_expression_type(value)
+            else:
+                for target in node.targets[0].elts:
+                    if isinstance(target, ast.Tuple):
+                        for nested_target in target.elts:
+                            self.type_info[nested_target.id] = 'int'
+                    else:
+                        self.type_info[target.id] = 'int'
         elif isinstance(node.value, ast.Tuple):
-            # For tuples, we'll use std::tuple
+            # For tuples, assign tuple type to variable
             if node.value.elts:
                 elt_types = []
                 for elt in node.value.elts:
@@ -134,7 +186,6 @@ class CodeAnalyzer:
                     elif isinstance(elt, ast.Subscript):
                         elt_types.append(self._get_type_name(elt))
                     elif isinstance(elt, ast.Tuple):
-                        # Handle nested tuples
                         nested_types = []
                         for nested_elt in elt.elts:
                             nested_types.append(self._infer_expression_type(nested_elt))
@@ -212,42 +263,54 @@ class CodeAnalyzer:
 
     def _infer_expression_type(self, node: ast.AST) -> str:
         """Infer the type of an expression."""
+        cache_key = id(node) if hasattr(node, 'lineno') else None
+        if cache_key is not None and cache_key in self._expr_type_cache:
+            return self._expr_type_cache[cache_key]
+
         print(f"Inferring expression type for: {type(node)}")
+        result: str = 'int'
+
         if isinstance(node, ast.Constant):
             if isinstance(node.value, int):
-                return 'int'
+                result = 'int'
             elif isinstance(node.value, float):
-                return 'double'
+                result = 'double'
             elif isinstance(node.value, str):
-                return 'std::string'
+                result = 'std::string'
             elif isinstance(node.value, bool):
-                return 'bool'
+                result = 'bool'
+            else:
+                result = 'int'
         elif isinstance(node, ast.Name):
             if node.id == 'int':
-                return 'int'
+                result = 'int'
             elif node.id == 'float':
-                return 'double'
+                result = 'double'
             elif node.id == 'str':
-                return 'std::string'
+                result = 'std::string'
             elif node.id == 'bool':
-                return 'bool'
-            return node.id
+                result = 'bool'
+            else:
+                result = node.id
         elif isinstance(node, ast.List):
             if node.elts:
                 elt_type = self._infer_expression_type(node.elts[0])
-                return f'std::vector<{elt_type}>'
-            return 'std::vector<int>'
+                result = f'std::vector<{elt_type}>'
+            else:
+                result = 'std::vector<int>'
         elif isinstance(node, ast.Dict):
             if node.keys and node.values:
                 key_type = self._infer_expression_type(node.keys[0])
                 value_type = self._infer_expression_type(node.values[0])
-                return f'std::map<{key_type}, {value_type}>'
-            return 'std::map<std::string, int>'
+                result = f'std::map<{key_type}, {value_type}>'
+            else:
+                result = 'std::map<std::string, int>'
         elif isinstance(node, ast.Set):
             if node.elts:
                 elt_type = self._infer_expression_type(node.elts[0])
-                return f'std::set<{elt_type}>'
-            return 'std::set<int>'
+                result = f'std::set<{elt_type}>'
+            else:
+                result = 'std::set<int>'
         elif isinstance(node, ast.Tuple):
             if node.elts:
                 elt_types = []
@@ -258,16 +321,18 @@ class CodeAnalyzer:
                         elt_types.append(self._get_type_name(elt))
                     else:
                         elt_types.append(self._infer_expression_type(elt))
-                return f'std::tuple<{", ".join(elt_types)}>'
-            return 'std::tuple<>'
+                result = f'std::tuple<{", ".join(elt_types)}>'
+            else:
+                result = 'std::tuple<>'
         elif isinstance(node, ast.BinOp):
             # For binary operations, infer type based on operands
             left_type = self._infer_expression_type(node.left)
             right_type = self._infer_expression_type(node.right)
             # If either operand is double, result is double
             if 'double' in (left_type, right_type):
-                return 'double'
-            return 'int'
+                result = 'double'
+            else:
+                result = 'int'
         elif isinstance(node, ast.Subscript):
             if isinstance(node.value, ast.Name):
                 base_type = node.value.id
@@ -275,18 +340,18 @@ class CodeAnalyzer:
                     elt = node.slice.value
                 else:  # Python 3.9 and later
                     elt = node.slice
-                
+
                 if base_type == 'list':
-                    return f'std::vector<{self._infer_expression_type(elt)}>'
+                    result = f'std::vector<{self._infer_expression_type(elt)}>'
                 elif base_type == 'dict':
                     if isinstance(elt, ast.Tuple):
                         key_type = self._infer_expression_type(elt.elts[0])
                         value_type = self._infer_expression_type(elt.elts[1])
-                        return f'std::map<{key_type}, {value_type}>'
+                        result = f'std::map<{key_type}, {value_type}>'
                     else:
-                        return f'std::map<std::string, {self._infer_expression_type(elt)}>'
+                        result = f'std::map<std::string, {self._infer_expression_type(elt)}>'
                 elif base_type == 'set':
-                    return f'std::set<{self._infer_expression_type(elt)}>'
+                    result = f'std::set<{self._infer_expression_type(elt)}>'
                 elif base_type == 'tuple':
                     if isinstance(elt, ast.Tuple):
                         elt_types = []
@@ -297,13 +362,19 @@ class CodeAnalyzer:
                                 elt_types.append(self._get_type_name(e))
                             else:
                                 elt_types.append(self._infer_expression_type(e))
-                        return f'std::tuple<{", ".join(elt_types)}>'
+                        result = f'std::tuple<{", ".join(elt_types)}>'
                     else:
-                        return f'std::tuple<{self._infer_expression_type(elt)}>'
+                        result = f'std::tuple<{self._infer_expression_type(elt)}>'
                 else:
-                    return base_type
-            return 'int'  # Default
-        return 'int'  # Default type
+                    result = base_type
+            else:
+                result = 'int'
+        else:
+            result = 'int'
+
+        if cache_key is not None:
+            self._expr_type_cache[cache_key] = result
+        return result
 
     def _analyze_control_flow(self, node: ast.AST) -> None:
         """Analyze control flow structures."""
