@@ -3,6 +3,11 @@ import ast
 import networkx as nx
 from dataclasses import dataclass
 from pathlib import Path
+import logging
+
+# Set up logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("CodeAnalyzer")
 
 @dataclass
 class AnalysisResult:
@@ -212,7 +217,7 @@ class CodeAnalyzer:
 
     def _infer_expression_type(self, node: ast.AST) -> str:
         """Infer the type of an expression."""
-        print(f"Inferring expression type for: {type(node)}")
+        logger.debug(f"Inferring expression type for: {type(node)}")
         if isinstance(node, ast.Constant):
             if isinstance(node.value, int):
                 return 'int'
@@ -410,9 +415,9 @@ class CodeAnalyzer:
 
     def _get_type_name(self, node: ast.AST) -> str:
         """Get C++ type name from Python type annotation."""
-        print(f"Processing node type: {type(node)}")
+        logger.debug(f"Processing node type: {type(node)}")
         if isinstance(node, ast.Name):
-            print(f"Name node: {node.id}")
+            logger.debug(f"Name node: {node.id}")
             if node.id == 'int':
                 return 'int'
             elif node.id == 'float':
@@ -423,29 +428,29 @@ class CodeAnalyzer:
                 return 'bool'
             return node.id
         elif isinstance(node, ast.Tuple):
-            print("Tuple node")
+            logger.debug("Tuple node")
             # Handle tuple type annotations directly
             elt_types = []
             for e in node.elts:
-                print(f"  Processing tuple element type: {type(e)}")
+                logger.debug(f"  Processing tuple element type: {type(e)}")
                 if isinstance(e, ast.Name):
                     elt_types.append(self._get_type_name(e))
                 elif isinstance(e, ast.Subscript):
                     elt_types.append(self._get_type_name(e))
                 else:
-                    print(f"  Unknown tuple element type: {type(e)}")
+                    logger.debug(f"  Unknown tuple element type: {type(e)}")
                     elt_types.append('int')  # Default type
             return f'std::tuple<{", ".join(elt_types)}>'
         elif isinstance(node, ast.Subscript):
-            print("Subscript node")
+            logger.debug("Subscript node")
             if isinstance(node.value, ast.Name):
                 base_type = node.value.id
-                print(f"  Base type: {base_type}")
+                logger.debug(f"  Base type: {base_type}")
                 if isinstance(node.slice, ast.Index):  # Python 3.8 and earlier
                     elt = node.slice.value
                 else:  # Python 3.9 and later
                     elt = node.slice
-                print(f"  Element type: {type(elt)}")
+                logger.debug(f"  Element type: {type(elt)}")
                 
                 if base_type == 'list':
                     return f'std::vector<{self._get_type_name(elt)}>'
@@ -462,13 +467,13 @@ class CodeAnalyzer:
                     if isinstance(elt, ast.Tuple):
                         elt_types = []
                         for e in elt.elts:
-                            print(f"    Processing tuple element type: {type(e)}")
+                            logger.debug(f"    Processing tuple element type: {type(e)}")
                             if isinstance(e, ast.Name):
                                 elt_types.append(self._get_type_name(e))
                             elif isinstance(e, ast.Subscript):
                                 elt_types.append(self._get_type_name(e))
                             else:
-                                print(f"    Unknown tuple element type: {type(e)}")
+                                logger.debug(f"    Unknown tuple element type: {type(e)}")
                                 elt_types.append('int')  # Default type
                         return f'std::tuple<{", ".join(elt_types)}>'
                     else:
@@ -479,13 +484,13 @@ class CodeAnalyzer:
                 # Handle tuple type annotations directly
                 elt_types = []
                 for e in node.value.elts:
-                    print(f"  Processing tuple element type: {type(e)}")
+                    logger.debug(f"  Processing tuple element type: {type(e)}")
                     if isinstance(e, ast.Name):
                         elt_types.append(self._get_type_name(e))
                     elif isinstance(e, ast.Subscript):
                         elt_types.append(self._get_type_name(e))
                     else:
-                        print(f"  Unknown tuple element type: {type(e)}")
+                        logger.debug(f"  Unknown tuple element type: {type(e)}")
                         elt_types.append('int')  # Default type
                 return f'std::tuple<{", ".join(elt_types)}>'
             elif isinstance(node.value, ast.Subscript):
@@ -493,7 +498,7 @@ class CodeAnalyzer:
                 return self._get_type_name(node.value)
             return 'int'  # Default
         elif isinstance(node, ast.Constant):
-            print(f"Constant node: {node.value}")
+            logger.debug(f"Constant node: {node.value}")
             if isinstance(node.value, str):
                 return 'std::string'
             elif isinstance(node.value, int):
@@ -503,7 +508,7 @@ class CodeAnalyzer:
             elif isinstance(node.value, bool):
                 return 'bool'
             return 'int'  # Default type
-        print(f"Unknown node type: {type(node)}")
+        logger.debug(f"Unknown node type: {type(node)}")
         return 'int'  # Default type
     
     def _check_loop_performance(self, node: ast.For) -> None:
