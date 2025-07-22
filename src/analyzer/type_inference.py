@@ -170,7 +170,8 @@ class TypeInferenceAnalyzer:
         # Store function signature information
         func_info = {
             'params': {},
-            'return_type': 'void'
+            'return_type': 'void',
+            'body': node.body  # Store the AST body for code generation
         }
         
         # Analyze parameters

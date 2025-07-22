@@ -143,6 +143,9 @@ namespace pytocpp {
                         break
                 
                 if not is_class_method:
+                    # Clean up function name (remove "function_" prefix if present)
+                    clean_func_name = func_name.replace('function_', '') if func_name.startswith('function_') else func_name
+                    
                     # Get return type
                     return_type = func_info.get('return_type', 'int')
                     
@@ -152,7 +155,7 @@ namespace pytocpp {
                         params.append(f"{param_type} {param_name}")
                     
                     # Add function declaration
-                    header += f"    {return_type} {func_name}({', '.join(params)});\n\n"
+                    header += f"    {return_type} {clean_func_name}({', '.join(params)});\n\n"
 
         header += "} // namespace pytocpp\n"
         return header
@@ -307,7 +310,9 @@ namespace pytocpp {
                         break
                 
                 if not is_class_method:
-                    impl += self._generate_function_impl(func_name, func_info)
+                    # Clean up function name (remove "function_" prefix if present)
+                    clean_func_name = func_name.replace('function_', '') if func_name.startswith('function_') else func_name
+                    impl += self._generate_function_impl(clean_func_name, func_info)
 
         impl += "} // namespace pytocpp\n"
         return impl
@@ -926,20 +931,55 @@ namespace pytocpp {
         # Handle tuple unpacking
         if isinstance(node.targets[0], ast.Tuple):
             if isinstance(node.value, ast.Tuple):
-                # Direct tuple unpacking: a, b = 1, 2
-                for i, target in enumerate(node.targets[0].elts):
-                    if i < len(node.value.elts):
-                        target_str = self._translate_expression(target, local_vars)
-                        value_str = self._translate_expression(node.value.elts[i], local_vars)
+                # Direct tuple unpacking: a, b = 1, 2 or a, b = b, a + b
+                # For simultaneous assignment, we need to evaluate all values first
+                target_vars = []
+                value_exprs = []
+                temp_vars = []
+                
+                # First, evaluate all values and store in temp variables if needed
+                for i, (target, value) in enumerate(zip(node.targets[0].elts, node.value.elts)):
+                    if isinstance(target, ast.Name):
+                        target_name = target.id
+                        value_expr = self._translate_expression(value, local_vars)
                         
-                        # Check if this is a new variable declaration
-                        if isinstance(target, ast.Name) and target.id not in local_vars:
-                            # Infer type from value
-                            value_type = self._infer_cpp_type(node.value.elts[i], local_vars)
-                            local_vars[target.id] = value_type
-                            result.append(f"{indent}{value_type} {target_str} = {value_str};")
+                        # Check if the value expression uses any of the target variables
+                        # This handles cases like a, b = b, a + b
+                        uses_target_vars = any(
+                            isinstance(t, ast.Name) and t.id == target_name 
+                            for t in node.targets[0].elts[:i]  # Only check previous targets
+                        )
+                        
+                        # If the value expression refers to variables we're about to change,
+                        # we need a temporary variable
+                        value_uses_changing_vars = self._expression_uses_variables(
+                            value, [t.id for t in node.targets[0].elts if isinstance(t, ast.Name)]
+                        )
+                        
+                        if value_uses_changing_vars and i > 0:
+                            # Create a temporary variable
+                            temp_var = f"temp_{i}"
+                            value_type = self._infer_cpp_type(value, local_vars)
+                            temp_vars.append(f"{indent}{value_type} {temp_var} = {value_expr};")
+                            value_exprs.append(temp_var)
                         else:
-                            result.append(f"{indent}{target_str} = {value_str};")
+                            value_exprs.append(value_expr)
+                        
+                        target_vars.append(target_name)
+                
+                # Generate temporary variable declarations first
+                result.extend(temp_vars)
+                
+                # Then generate the actual assignments
+                for i, (target_name, value_expr) in enumerate(zip(target_vars, value_exprs)):
+                    if target_name not in local_vars:
+                        # Infer type from value
+                        value_type = self._infer_cpp_type(node.value.elts[i], local_vars)
+                        local_vars[target_name] = value_type
+                        result.append(f"{indent}{value_type} {target_name} = {value_expr};")
+                    else:
+                        result.append(f"{indent}{target_name} = {value_expr};")
+                
                 return "\n".join(result)
             else:
                 # Handle tuple unpacking like: a, b = some_func()
@@ -1578,3 +1618,10 @@ namespace pytocpp {
         cmake_content.append(')')
         
         return '\n'.join(cmake_content)
+    
+    def _expression_uses_variables(self, expr: ast.AST, variable_names: List[str]) -> bool:
+        """Check if an expression uses any of the given variable names."""
+        for node in ast.walk(expr):
+            if isinstance(node, ast.Name) and node.id in variable_names:
+                return True
+        return False
