@@ -8,43 +8,21 @@ from typing import List, Dict, Union, Optional, Type, TypeVar, Any
 import numpy as np
 from . import cpp_impl
 
-# Import C++ classes
-from .cpp_impl import Shape, Rectangle, Circle
-
-def calculate_total_area(
-    shapes: List[Shape], use_cpp: bool = True) -> float:
+def calculate_fibonacci(
+    n: int, use_cpp: bool = True) -> int:
     """
-    Calculate the total area of a list of shapes.
+    Compute the calculate_fibonacci function using either C++ or Python implementation.
     
     Args:
-        shapes: List of Shape objects
+        n: Input value
         use_cpp: Whether to use C++ implementation (default: True)
     
     Returns:
-        Total area of all shapes
+        Computed value of the calculate_fibonacci function
     """
     if use_cpp:
-        return cpp_impl.calculate_total_area(shapes)
+        return cpp_impl.calculate_fibonacci(n)
     else:
         # Use original Python implementation
-        import examples.class_example
-        return examples.class_example.calculate_total_area(shapes)
-
-def get_shape_info(
-    shape: Union[Rectangle, Circle], use_cpp: bool = True) -> Dict[str, Union[float, str]]:
-    """
-    Get information about a shape.
-    
-    Args:
-        shape: A Rectangle or Circle object
-        use_cpp: Whether to use C++ implementation (default: True)
-    
-    Returns:
-        Dictionary with shape information
-    """
-    if use_cpp:
-        return cpp_impl.get_shape_info(shape)
-    else:
-        # Use original Python implementation
-        import examples.class_example
-        return examples.class_example.get_shape_info(shape)
+        import examples.simple_example
+        return examples.simple_example.calculate_fibonacci(n)

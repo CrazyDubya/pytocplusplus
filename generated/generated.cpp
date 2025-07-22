@@ -15,69 +15,17 @@
 
 namespace pytocpp {
 
-Shape::Shape(std::string color) {
-    color_ = color;
-}
-
-double Shape::area() const {
-    return 0.0;}
-
-std::string Shape::describe() const {
-    return "A " + color_ + " shape";}
-
-Rectangle::Rectangle(double width, double height, std::string color) : Shape(color) {
-    width_ = width;
-    height_ = height;
-    color_ = color;
-}
-
-double Rectangle::area() const {
-    return (width_ * height_);}
-
-std::string Rectangle::describe() const {
-    return "A " + color_ + " rectangle with width " + std::to_string(width_) + " and height " + std::to_string(height_);}
-
-Circle::Circle(double radius, std::string color) : Shape(color) {
-    radius_ = radius;
-    color_ = color;
-}
-
-double Circle::area() const {
-    // Using math constants
-    const double pi = M_PI;
-    return (pi * pow(radius_, 2));}
-
-std::string Circle::describe() const {
-    return "A " + color_ + " circle with radius " + std::to_string(radius_);}
-
-double calculate_total_area(std::vector<Shape> shapes) {
-    double total = 0.0;
-    for (const auto& shape : shapes) {
-        total += shape.area();
+int calculate_fibonacci(int n) {
+    if (n <= 1) {
+        return n;
     }
-    return total;
-}
-
-std::map<std::string, std::variant<double, std::string>> get_shape_info(std::variant<Rectangle, Circle> shape) {
-    // Create return map with appropriate type for Union values
-    std::map<std::string, std::variant<double, std::string>> info;
-
-    // Use visitor pattern to handle different shape types
-    std::visit([&info](auto&& s) {
-        // Common attributes for all shapes using public interface
-        info["area"] = s.area();
-        info["description"] = s.describe();
-
-        // Add shape-specific attributes
-        if constexpr (std::is_same_v<std::decay_t<decltype(s)>, Rectangle>) {
-            info["type"] = std::string("Rectangle");
-        } else if constexpr (std::is_same_v<std::decay_t<decltype(s)>, Circle>) {
-            info["type"] = std::string("Circle");
-        }
-    }, shape);
-
-    return info;
-}
+    int a = 0;
+    int b = 1;
+    for (int i = 2; i < (n + 1); i += 1) {
+        a = b;
+        b = (a + b);
+    }
+    return b;}
 
 void main() {
     // Create shapes list
