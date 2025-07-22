@@ -6,25 +6,25 @@ from pathlib import Path
 # Fix imports to work with both module and script execution
 try:
     # When run as a script
-    from analyzer.code_analyzer_fixed import CodeAnalyzer
+    from analyzer.code_analyzer import CodeAnalyzer
     from rules.rule_manager import RuleManager
     from rules.basic_rules import (
         VariableDeclarationRule,
         FunctionDefinitionRule,
         ClassDefinitionRule
     )
-    from converter.code_generator_fixed import CodeGenerator
+    from converter.code_generator import CodeGenerator
     from testing.benchmark_runner import BenchmarkRunner
 except ImportError:
     # When run as a module
-    from src.analyzer.code_analyzer_fixed import CodeAnalyzer
+    from src.analyzer.code_analyzer import CodeAnalyzer
     from src.rules.rule_manager import RuleManager
     from src.rules.basic_rules import (
         VariableDeclarationRule,
         FunctionDefinitionRule,
         ClassDefinitionRule
     )
-    from src.converter.code_generator_fixed import CodeGenerator
+    from src.converter.code_generator import CodeGenerator
     from src.testing.benchmark_runner import BenchmarkRunner
 
 # Set up logging

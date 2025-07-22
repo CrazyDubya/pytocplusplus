@@ -7,6 +7,6 @@ namespace py = pybind11;
 PYBIND11_MODULE(cpp_impl, m) {
     m.doc() = "C++ implementations for optimized numerical operations";
 
-    m.def("calculate_fibonacci", &pytocpp::calculate_fibonacci, "Calculate the nth Fibonacci number.");
-    m.def("main", &pytocpp::main, "None");
+    m.def("function_calculate_fibonacci", &pytocpp::function_calculate_fibonacci, "");
+    m.def("function_main", &pytocpp::function_main, "");
 }

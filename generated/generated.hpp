@@ -15,8 +15,8 @@
 
 namespace pytocpp {
 
-    int calculate_fibonacci(int n);
+    int function_calculate_fibonacci(int n);
 
-    void main();
+    void function_main();
 
 } // namespace pytocpp
