@@ -3,7 +3,7 @@ from pathlib import Path
 import ast
 import tempfile
 import os
-from src.analyzer.code_analyzer_fixed import CodeAnalyzer, AnalysisResult
+from src.analyzer.code_analyzer import CodeAnalyzer, AnalysisResult
 
 class TestCodeAnalyzer:
     

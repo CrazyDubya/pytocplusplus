@@ -1,4 +1,7 @@
-#include "generated.hpp"
+#pragma once
+
+#include <memory>
+#include <string>
 #include <vector>
 #include <map>
 #include <set>
@@ -8,20 +11,12 @@
 #include <stdexcept>
 #include <algorithm>
 #include <numeric>
-#include <iostream>
-#include <string>
-#include <sstream>
 #include <cmath>
 
 namespace pytocpp {
 
-int function_calculate_fibonacci(int n) {
-    // Function implementation
-    return 0;
-}
+    int calculate_fibonacci(int n);
 
-void function_main() {
-    // Function implementation
-}
+    void main();
 
 } // namespace pytocpp

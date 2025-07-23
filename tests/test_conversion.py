@@ -56,4 +56,4 @@ def test_fibonacci_conversion(tmp_path):
     # Verify CMake content
     cmake_content = (output_dir / "CMakeLists.txt").read_text()
     assert "cmake_minimum_required" in cmake_content
-    assert "project(pytocpp_generated)" in cmake_content 
+    assert "project(pytocpp_generated)" in cmake_content

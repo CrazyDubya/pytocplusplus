@@ -6,31 +6,31 @@ from pathlib import Path
 # Fix imports to work with both module and script execution
 try:
     # When run as a script
-    from analyzer.code_analyzer_fixed import CodeAnalyzer
+    from analyzer.code_analyzer import CodeAnalyzer
     from rules.rule_manager import RuleManager
     from rules.basic_rules import (
         VariableDeclarationRule,
         FunctionDefinitionRule,
         ClassDefinitionRule
     )
-    from converter.code_generator_fixed import CodeGenerator
+    from converter.code_generator import CodeGenerator
     from testing.benchmark_runner import BenchmarkRunner
+    from utils.error_handling import get_enhanced_logger, ValidationHelper
 except ImportError:
     # When run as a module
-    from src.analyzer.code_analyzer_fixed import CodeAnalyzer
+    from src.analyzer.code_analyzer import CodeAnalyzer
     from src.rules.rule_manager import RuleManager
     from src.rules.basic_rules import (
         VariableDeclarationRule,
         FunctionDefinitionRule,
         ClassDefinitionRule
     )
-    from src.converter.code_generator_fixed import CodeGenerator
+    from src.converter.code_generator import CodeGenerator
     from src.testing.benchmark_runner import BenchmarkRunner
+    from src.utils.error_handling import get_enhanced_logger, ValidationHelper
 
-# Set up logging
-logging.basicConfig(level=logging.INFO, 
-                   format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger("PyToC++")
+# Set up enhanced logging
+logger = get_enhanced_logger("PyToC++")
 
 def setup_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Convert Python code to optimized C++")
@@ -63,7 +63,16 @@ def analyze_python_code(analyzer: CodeAnalyzer, input_path: Path):
     """Analyze Python code and return results."""
     try:
         logger.info(f"Analyzing Python code: {input_path}")
+        # Validate input file first
+        ValidationHelper.validate_python_file(input_path)
+        
         return analyzer.analyze_file(input_path)
+    except FileNotFoundError as e:
+        logger.error(f"File not found: {e}")
+        sys.exit(1)
+    except SyntaxError as e:
+        logger.error(f"Python syntax error: {e}")
+        sys.exit(1)
     except Exception as e:
         logger.error(f"Error analyzing Python code: {e}")
         sys.exit(1)
@@ -72,8 +81,14 @@ def generate_cpp_code(generator: CodeGenerator, analysis_result, output_dir: Pat
     """Generate C++ code from analysis results."""
     try:
         logger.info(f"Generating C++ code in: {output_dir}")
+        # Validate output directory
+        ValidationHelper.validate_output_directory(output_dir)
+        
         generator.generate_code(analysis_result, output_dir)
-        logger.info("✅ C++ code generation successful")
+        logger.success("C++ code generation successful")
+    except PermissionError as e:
+        logger.error(f"Permission error: {e}")
+        sys.exit(1)
     except Exception as e:
         logger.error(f"Error generating C++ code: {e}")
         sys.exit(1)
@@ -94,6 +109,10 @@ def main():
     # Validate input file
     if not input_path.exists():
         logger.error(f"Input file not found: {input_path}")
+        sys.exit(1)
+    
+    if not input_path.suffix == '.py':
+        logger.error(f"Input file must be a Python file (.py): {input_path}")
         sys.exit(1)
     
     # Initialize components

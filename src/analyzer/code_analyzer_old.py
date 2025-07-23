@@ -5,18 +5,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import logging
 
+# Import specialized analyzers
+from .type_inference import TypeInferenceAnalyzer
+from .class_analyzer import ClassAnalyzer, ClassInfo
+from .performance_analyzer import PerformanceAnalyzer
+
 # Set up logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("CodeAnalyzer")
-
-@dataclass
-class ClassInfo:
-    """Information about a class definition."""
-    name: str
-    docstring: Optional[str] = None
-    bases: List[str] = field(default_factory=list)
-    attributes: Dict[str, str] = field(default_factory=dict)  # attr_name -> type
-    methods: Dict[str, Dict[str, Any]] = field(default_factory=dict)  # method_name -> info
 
 @dataclass
 class AnalysisResult:
@@ -33,14 +29,14 @@ class CodeAnalyzer:
     """Analyzes Python code for conversion to C++."""
     
     def __init__(self):
-        self.type_info: Dict[str, Any] = {}
-        self.class_info: Dict[str, ClassInfo] = {}
-        self.current_class: Optional[str] = None
-        self.performance_bottlenecks: List[Dict[str, Any]] = []
-        self.memory_usage: Dict[str, int] = {}
-        self.hot_paths: List[List[str]] = []
+        # Initialize specialized analyzers
+        self.type_analyzer = TypeInferenceAnalyzer()
+        self.class_analyzer = ClassAnalyzer()
+        self.performance_analyzer = PerformanceAnalyzer()
+        
+        # Dependencies analysis - kept local for now
         self.dependencies = nx.DiGraph()
-        self.complexity: Dict[str, int] = {}
+        self.hot_paths: List[List[str]] = []
     
     def analyze_file(self, file_path: Path) -> AnalysisResult:
         """Analyze a Python file and return the results."""
@@ -51,29 +47,112 @@ class CodeAnalyzer:
             
             tree = ast.parse(content)
             
-            # Perform various analyses
-            self._analyze_classes(tree)  # Analyze classes first to detect inheritance
-            self._analyze_types(tree)
-            self._analyze_performance(tree)
-            self._analyze_memory_usage(tree)
-            self._analyze_hot_paths(tree)
+            # Use specialized analyzers
+            logger.debug("Running class analysis...")
+            class_info = self.class_analyzer.analyze_classes(tree)
+            
+            logger.debug("Running type inference...")
+            type_info = self.type_analyzer.analyze_types(tree)
+            
+            logger.debug("Running performance analysis...")
+            perf_results = self.performance_analyzer.analyze_performance(tree)
+            
+            # Simple dependency and hot path analysis
             self._analyze_dependencies(tree)
-            self._analyze_complexity(tree)
+            self._analyze_hot_paths(tree)
             
             return AnalysisResult(
-                type_info=self.type_info,
-                class_info=self.class_info,
-                performance_bottlenecks=self.performance_bottlenecks,
-                memory_usage=self.memory_usage,
+                type_info=type_info,
+                class_info=class_info,
+                performance_bottlenecks=perf_results['performance_bottlenecks'],
+                memory_usage=perf_results['memory_usage'],
                 hot_paths=self.hot_paths,
                 dependencies=self.dependencies,
-                complexity=self.complexity
+                complexity=perf_results['complexity']
             )
         except Exception as e:
             logger.error(f"Error analyzing file: {e}")
             raise
     
-    def _analyze_classes(self, tree: ast.AST) -> None:
+    def _analyze_dependencies(self, tree: ast.AST) -> None:
+        """Analyze dependencies between functions and classes."""
+        self.dependencies.clear()
+        
+        # Simple dependency analysis - can be enhanced
+        functions = []
+        classes = []
+        
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                functions.append(node.name)
+                self.dependencies.add_node(node.name, type='function')
+            elif isinstance(node, ast.ClassDef):
+                classes.append(node.name)
+                self.dependencies.add_node(node.name, type='class')
+                # Add inheritance dependencies
+                for base in node.bases:
+                    if isinstance(base, ast.Name):
+                        self.dependencies.add_edge(base.id, node.name, type='inheritance')
+        
+        # Analyze function calls to create dependencies
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                if isinstance(node.func, ast.Name):
+                    caller = self._find_containing_function_or_class(node, tree)
+                    if caller and node.func.id in functions:
+                        self.dependencies.add_edge(caller, node.func.id, type='call')
+    
+    def _analyze_hot_paths(self, tree: ast.AST) -> None:
+        """Identify potential hot paths in the code."""
+        self.hot_paths.clear()
+        
+        # Simple heuristic: nested loops and frequently called functions
+        for node in ast.walk(tree):
+            if isinstance(node, ast.For):
+                # Check for nested loops
+                nested_level = self._count_loop_nesting(node)
+                if nested_level > 1:
+                    path = [f"nested_loop_level_{nested_level}"]
+                    self.hot_paths.append(path)
+    
+    def _find_containing_function_or_class(self, target_node: ast.AST, tree: ast.AST) -> Optional[str]:
+        """Find the function or class containing a given node."""
+        # Simple implementation - could be enhanced
+        for node in ast.walk(tree):
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                if self._node_contains(node, target_node):
+                    return node.name
+        return None
+    
+    def _node_contains(self, container: ast.AST, target: ast.AST) -> bool:
+        """Check if a container node contains a target node."""
+        for child in ast.walk(container):
+            if child is target:
+                return True
+        return False
+    
+    def _count_loop_nesting(self, node: ast.AST) -> int:
+        """Count the nesting level of loops."""
+        max_nesting = 0
+        current_nesting = 0
+        
+        def visit_node(n):
+            nonlocal max_nesting, current_nesting
+            
+            if isinstance(n, (ast.For, ast.While)):
+                current_nesting += 1
+                max_nesting = max(max_nesting, current_nesting)
+                
+                for child in ast.iter_child_nodes(n):
+                    visit_node(child)
+                
+                current_nesting -= 1
+            else:
+                for child in ast.iter_child_nodes(n):
+                    visit_node(child)
+        
+        visit_node(node)
+        return max_nesting
         """Analyze class definitions in the code."""
         # First pass: collect all class names and inheritance
         for node in ast.walk(tree):
