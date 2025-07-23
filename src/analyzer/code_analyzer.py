@@ -269,7 +269,7 @@ class CodeAnalyzer:
         if cache_key is not None and cache_key in self._expr_type_cache:
             return self._expr_type_cache[cache_key]
 
-        print(f"Inferring expression type for: {type(node)}")
+        self.logger.debug(f"Inferring expression type for: {type(node)}")
         result: str = 'int'
 
         if isinstance(node, ast.Constant):
