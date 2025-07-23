@@ -264,7 +264,7 @@ class CodeAnalyzer:
     def _infer_expression_type(self, node: ast.AST) -> str:
         """Infer the type of an expression."""
         # Define a set of cacheable node types
-        cacheable_node_types = {ast.Constant, ast.Name, ast.List, ast.Dict, ast.Set}
+        cacheable_node_types = {ast.Constant, ast.Name, ast.List, ast.Dict, ast.Set, ast.Tuple}
         cache_key = id(node) if type(node) in cacheable_node_types else None
         if cache_key is not None and cache_key in self._expr_type_cache:
             return self._expr_type_cache[cache_key]
