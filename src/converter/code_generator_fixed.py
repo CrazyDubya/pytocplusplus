@@ -1098,8 +1098,8 @@ namespace pytocpp {
             iterable = self._translate_expression(node.generators[0].iter, local_vars)
             key_expr = self._translate_expression(node.key, local_vars)
             value_expr = self._translate_expression(node.value, local_vars)
-            return (
-                f"([&]() {{ std::map<{key_type}, {value_type}> result; for (const auto& {target} : {iterable}) {{ result[{key_expr}] = {value_expr}; }} return result; }})()"
+            return self._generate_dict_comprehension(
+                key_type, value_type, target, iterable, key_expr, value_expr
             )
         elif isinstance(node, ast.Dict):
             # Handle dict literals
