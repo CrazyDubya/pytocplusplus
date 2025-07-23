@@ -1090,9 +1090,7 @@ namespace pytocpp {
             target = self._translate_expression(node.generators[0].target, local_vars)
             iterable = self._translate_expression(node.generators[0].iter, local_vars)
             expr = self._translate_expression(node.elt, local_vars)
-            return (
-                f"([&]() {{ std::vector<{elt_type}> result; for (const auto& {target} : {iterable}) {{ result.push_back({expr}); }} return result; }})()"
-            )
+            return self._generate_list_comprehension(elt_type, target, iterable, expr)
         elif isinstance(node, ast.DictComp):
             key_type = self._infer_cpp_type(node.key, local_vars)
             value_type = self._infer_cpp_type(node.value, local_vars)
