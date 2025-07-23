@@ -215,7 +215,7 @@ class CodeAnalyzer:
         """Analyze and infer types for a single node."""
         if isinstance(node, ast.Assign):
             self._infer_variable_type(node)
-        elif isinstance(node, ast.FunctionDef) and not (node.args.args and node.args.args[0].arg == 'self'):
+        elif isinstance(node, ast.FunctionDef) and not (node.args.args and len(node.args.args) > 0 and node.args.args[0].arg == 'self'):
             # Only analyze standalone functions here; class methods are handled separately
             self._infer_function_types(node)
 
