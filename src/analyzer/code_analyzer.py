@@ -95,7 +95,7 @@ class CodeAnalyzer:
     def _infer_variable_type(self, node: ast.Assign) -> None:
         """Infer the type of a variable assignment."""
         # Handle tuple targets (unpacking assignments) early
-        if isinstance(node.targets[0], ast.Tuple):
+        if node.targets and isinstance(node.targets[0], ast.Tuple):
             # Move existing tuple unpacking logic here
             if isinstance(node.value, ast.Call):
                 if isinstance(node.value.func, ast.Name):
