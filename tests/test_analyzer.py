@@ -166,7 +166,7 @@ nested_tuple = ((1, 2), (3, 4))
             assert result.type_info['int_list'] == 'std::vector<int>'
             assert result.type_info['str_list'] == 'std::vector<std::string>'
             
-            assert result.type_info['simple_dict'] == 'std::map<std::string, int>'
+            assert result.type_info['simple_dict'] == 'std::unordered_map<std::string, int>'
             # complex_dict depends on implementation quality
             
             assert result.type_info['int_set'] == 'std::set<int>'
@@ -184,17 +184,17 @@ nested_tuple = ((1, 2), (3, 4))
         
         # Test variable assignment
         assign_node = ast.parse("x = 42").body[0]
-        analyzer._infer_variable_type(assign_node)
-        assert analyzer.type_info['x'] == 'int'
+        analyzer.type_analyzer._infer_variable_type(assign_node)
+        assert analyzer.type_analyzer.type_info['x'] == 'int'
         
         # Test tuple unpacking
         tuple_node = ast.parse("a, b = 1, 2").body[0]
-        analyzer._infer_variable_type(tuple_node)
-        assert 'a' in analyzer.type_info
-        assert 'b' in analyzer.type_info
+        analyzer.type_analyzer._infer_variable_type(tuple_node)
+        assert 'a' in analyzer.type_analyzer.type_info
+        assert 'b' in analyzer.type_analyzer.type_info
         
         # Test function definition
         func_node = ast.parse("def test(x: int) -> str: pass").body[0]
-        analyzer._infer_function_types(func_node)
-        assert analyzer.type_info['test']['params']['x'] == 'int'
-        assert analyzer.type_info['test']['return_type'] == 'std::string'
+        analyzer.type_analyzer._analyze_function_types(func_node)
+        assert analyzer.type_analyzer.type_info['test']['params']['x'] == 'int'
+        assert analyzer.type_analyzer.type_info['test']['return_type'] == 'std::string'

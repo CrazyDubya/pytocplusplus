@@ -177,7 +177,7 @@ nested_tuple = ((1, 2), (3, 4))
             assert result.type_info['int_list'] == 'std::vector<int>'
             assert result.type_info['str_list'] == 'std::vector<std::string>'
             
-            assert result.type_info['simple_dict'] == 'std::map<std::string, int>'
+            assert result.type_info['simple_dict'] == 'std::unordered_map<std::string, int>'
             # complex_dict mapping depends on implementation quality
             
             assert result.type_info['int_set'] == 'std::set<int>'
@@ -282,11 +282,11 @@ def complex_function(x):
         analyzer = CodeAnalyzer()
         
         # Test various expression types
-        assert analyzer._infer_expression_type(ast.Constant(value=42)) == 'int'
-        assert analyzer._infer_expression_type(ast.Constant(value=3.14)) == 'double'
-        assert analyzer._infer_expression_type(ast.Constant(value="hello")) == 'std::string'
-        assert analyzer._infer_expression_type(ast.Constant(value=True)) == 'bool'
-        assert analyzer._infer_expression_type(ast.Constant(value=None)) == 'std::nullptr_t'
+        assert analyzer.type_analyzer._infer_expression_type(ast.Constant(value=42)) == 'int'
+        assert analyzer.type_analyzer._infer_expression_type(ast.Constant(value=3.14)) == 'double'
+        assert analyzer.type_analyzer._infer_expression_type(ast.Constant(value="hello")) == 'std::string'
+        assert analyzer.type_analyzer._infer_expression_type(ast.Constant(value=True)) == 'bool'
+        assert analyzer.type_analyzer._infer_expression_type(ast.Constant(value=None)) == 'std::nullptr_t'
         
         # Test binary operations
         bin_op = ast.BinOp(
@@ -294,7 +294,7 @@ def complex_function(x):
             op=ast.Add(),
             right=ast.Constant(value=2)
         )
-        assert analyzer._infer_expression_type(bin_op) == 'int'
+        assert analyzer.type_analyzer._infer_expression_type(bin_op) == 'int'
         
         # Test comparisons
         compare = ast.Compare(
@@ -302,14 +302,14 @@ def complex_function(x):
             ops=[ast.Eq()],
             comparators=[ast.Constant(value=2)]
         )
-        assert analyzer._infer_expression_type(compare) == 'bool'
+        assert analyzer.type_analyzer._infer_expression_type(compare) == 'bool'
         
         # Test boolean operations
         bool_op = ast.BoolOp(
             op=ast.And(),
             values=[ast.Constant(value=True), ast.Constant(value=False)]
         )
-        assert analyzer._infer_expression_type(bool_op) == 'bool'
+        assert analyzer.type_analyzer._infer_expression_type(bool_op) == 'bool'
     
     def test_type_annotation_handling(self):
         """Test handling of Python type annotations."""

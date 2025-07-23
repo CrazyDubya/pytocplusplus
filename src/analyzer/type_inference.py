@@ -154,6 +154,8 @@ class TypeInferenceAnalyzer:
                 result = 'double'
             elif isinstance(expr.value, str):
                 result = 'std::string'
+            elif expr.value is None:
+                result = 'std::nullptr_t'
         elif isinstance(expr, ast.List):
             if expr.elts:
                 element_type = self._infer_expression_type(expr.elts[0])
@@ -174,6 +176,15 @@ class TypeInferenceAnalyzer:
                 result = f'std::set<{element_type or "int"}>'
             else:
                 result = 'std::set<int>'
+        elif isinstance(expr, ast.Tuple):
+            if expr.elts:
+                types = []
+                for elt in expr.elts:
+                    elt_type = self._infer_expression_type(elt)
+                    types.append(elt_type or "auto")
+                result = f'std::tuple<{", ".join(types)}>'
+            else:
+                result = 'std::tuple<>'
         elif isinstance(expr, ast.Name):
             # Look up the variable type if we know it
             result = self.type_info.get(expr.id, 'auto')
@@ -199,6 +210,12 @@ class TypeInferenceAnalyzer:
             key_type = self._infer_expression_type(expr.key)
             value_type = self._infer_expression_type(expr.value)
             result = f'std::unordered_map<{key_type or "auto"}, {value_type or "auto"}>'
+        elif isinstance(expr, ast.Compare):
+            # Comparison operations return boolean
+            result = 'bool'
+        elif isinstance(expr, ast.BoolOp):
+            # Boolean operations (and, or) return boolean
+            result = 'bool'
         
         # Cache the result if we found one
         if result is not None:
@@ -231,5 +248,29 @@ class TypeInferenceAnalyzer:
             return_type = self._annotation_to_cpp_type(node.returns)
             if return_type:
                 func_info['return_type'] = return_type
+        else:
+            # Try to infer return type from return statements
+            inferred_return_type = self._infer_return_type_from_body(node.body)
+            if inferred_return_type:
+                func_info['return_type'] = inferred_return_type
         
         self.type_info[node.name] = func_info
+    
+    def _infer_return_type_from_body(self, body: List[ast.AST]) -> Optional[str]:
+        """Infer return type from return statements in function body."""
+        return_types = set()
+        
+        for node in ast.walk(ast.Module(body=body)):
+            if isinstance(node, ast.Return) and node.value:
+                ret_type = self._infer_expression_type(node.value)
+                if ret_type:
+                    return_types.add(ret_type)
+        
+        # If all return statements have the same type, use that
+        if len(return_types) == 1:
+            return return_types.pop()
+        elif len(return_types) > 1:
+            # Multiple different return types - use auto for now
+            return 'auto'
+        
+        return None  # No return statements found

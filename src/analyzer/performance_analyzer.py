@@ -74,10 +74,11 @@ class PerformanceAnalyzer:
         if isinstance(node, (ast.For, ast.While)):
             # Check for nested loops
             nested_loops = self._count_nested_loops(node)
-            if nested_loops > 2:
+            if nested_loops >= 2:  # Detect 2+ level nesting (changed from > 2)
                 line = getattr(node, 'lineno', 0)
                 self.performance_bottlenecks.append({
                     'type': 'nested_loops',
+                    'description': f'Nested loop detected with {nested_loops} levels of nesting',
                     'nesting_level': nested_loops,
                     'line': line,
                     'suggestion': 'Consider algorithm optimization to reduce nesting'
@@ -89,6 +90,7 @@ class PerformanceAnalyzer:
                 line = getattr(node, 'lineno', 0)
                 self.performance_bottlenecks.append({
                     'type': 'expensive_loop_operations',
+                    'description': f'Container modification in loop: {", ".join(expensive_ops)}',
                     'operations': expensive_ops,
                     'line': line,
                     'suggestion': 'Move expensive operations outside the loop when possible'
