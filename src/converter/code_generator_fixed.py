@@ -1044,7 +1044,8 @@ namespace pytocpp {
                     args = [self._translate_expression(arg, local_vars) for arg in node.args]
                     return f"{obj}.push_back({', '.join(args)})"
                 elif func_name in self.MATH_FUNCTIONS:
-                    # math functions imported directly
+                    # Handles math functions (e.g., sqrt, sin, cos) called without the module prefix,
+                    # assuming they are directly imported from the math module.
                     args = [self._translate_expression(arg, local_vars) for arg in node.args]
                     return f"std::{func_name}({', '.join(args)})"
                 else:
