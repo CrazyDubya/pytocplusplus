@@ -1043,7 +1043,7 @@ namespace pytocpp {
                     obj = self._translate_expression(node.func.value.value, local_vars)
                     args = [self._translate_expression(arg, local_vars) for arg in node.args]
                     return f"{obj}.push_back({', '.join(args)})"
-                elif func_name in ['sqrt', 'sin', 'cos']:
+                elif func_name in self.MATH_FUNCTIONS:
                     # math functions imported directly
                     args = [self._translate_expression(arg, local_vars) for arg in node.args]
                     return f"std::{func_name}({', '.join(args)})"
