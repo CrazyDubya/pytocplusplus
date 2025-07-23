@@ -5,8 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import logging
 
-# Set up logging
-logging.basicConfig(level=logging.INFO)
+# Set up logger
 logger = logging.getLogger("CodeAnalyzer")
 
 @dataclass
