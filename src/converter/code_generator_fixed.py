@@ -1087,6 +1087,8 @@ namespace pytocpp {
             return f"std::vector<{element_type}>{{{', '.join(elements)}}}"
         elif isinstance(node, ast.ListComp):
             elt_type = self._infer_cpp_type(node.elt, local_vars)
+            if not node.generators:
+                raise ValueError("List comprehension node has no generators. Malformed AST.")
             target = self._translate_expression(node.generators[0].target, local_vars)
             iterable = self._translate_expression(node.generators[0].iter, local_vars)
             expr = self._translate_expression(node.elt, local_vars)
