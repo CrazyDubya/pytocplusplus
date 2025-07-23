@@ -277,6 +277,7 @@ namespace pytocpp {
         impl = """#include "generated.hpp"
 #include <vector>
 #include <map>
+#include <unordered_map>
 #include <set>
 #include <tuple>
 #include <optional>
@@ -1083,6 +1084,10 @@ namespace pytocpp {
                     obj = self._translate_expression(node.func.value.value, local_vars)
                     args = [self._translate_expression(arg, local_vars) for arg in node.args]
                     return f"{obj}.push_back({', '.join(args)})"
+                elif func_name in ['sqrt', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'exp', 'log', 'log10', 'floor', 'ceil', 'fabs']:
+                    # Handle direct imports from math module (e.g., from math import sqrt)
+                    args = [self._translate_expression(arg, local_vars) for arg in node.args]
+                    return f"std::{func_name}({', '.join(args)})"
                 else:
                     # Regular function call
                     args = [self._translate_expression(arg, local_vars) for arg in node.args]
@@ -1091,6 +1096,16 @@ namespace pytocpp {
                 # Handle method calls like obj.method()
                 obj = self._translate_expression(node.func.value, local_vars)
                 method = node.func.attr
+                
+                # Handle math module functions
+                if obj == 'math':
+                    if method in ['sqrt', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'exp', 'log', 'log10', 'pow', 'floor', 'ceil', 'fabs']:
+                        args = [self._translate_expression(arg, local_vars) for arg in node.args]
+                        return f"std::{method}({', '.join(args)})"
+                    else:
+                        # Handle other math functions that may need special mapping
+                        args = [self._translate_expression(arg, local_vars) for arg in node.args]
+                        return f"std::{method}({', '.join(args)})"
                 
                 # Map Python methods to C++ equivalents
                 if method == 'append':
@@ -1153,6 +1168,12 @@ namespace pytocpp {
                 return "std::make_tuple()"
                 
             return f"std::make_tuple({', '.join(elements)})"
+        elif isinstance(node, ast.ListComp):
+            # Handle list comprehensions: [expr for item in iterable]
+            return self._translate_list_comprehension(node, local_vars)
+        elif isinstance(node, ast.DictComp):
+            # Handle dictionary comprehensions: {key: value for item in iterable}
+            return self._translate_dict_comprehension(node, local_vars)
         elif isinstance(node, ast.BoolOp):
             # Handle boolean operations like and, or
             op_str = "&&" if isinstance(node.op, ast.And) else "||"
@@ -1618,6 +1639,122 @@ namespace pytocpp {
         cmake_content.append(')')
         
         return '\n'.join(cmake_content)
+    
+    def _translate_list_comprehension(self, node: ast.ListComp, local_vars: Dict[str, str]) -> str:
+        """Translate list comprehension to C++ lambda with performance optimizations."""
+        # Get the comprehension parts
+        element_expr = node.elt
+        generator = node.generators[0]  # For simplicity, handle only one generator
+        target = generator.target
+        iter_expr = generator.iter
+        
+        # Translate components
+        iter_str = self._translate_expression(iter_expr, local_vars)
+        target_name = target.id if isinstance(target, ast.Name) else "item"
+        element_str = self._translate_expression(element_expr, local_vars)
+        
+        # Handle conditional comprehensions (if clauses)
+        condition_str = ""
+        if generator.ifs:
+            conditions = []
+            for if_clause in generator.ifs:
+                condition = self._translate_expression(if_clause, local_vars)
+                conditions.append(condition)
+            condition_str = f" if ({' && '.join(conditions)})"
+        
+        # Create lambda expression for the comprehension with performance optimizations
+        # [expr for item in iterable] becomes:
+        # [&]() { 
+        #   std::vector<auto> result; 
+        #   result.reserve(iterable.size());  // Performance optimization
+        #   for (auto item : iterable) { 
+        #     if (condition) {  // Only if conditions exist
+        #       result.push_back(expr); 
+        #     }
+        #   } 
+        #   return result; 
+        # }()
+        
+        if condition_str:
+            comprehension_code = f"""[&]() {{
+    std::vector<auto> result;
+    result.reserve({iter_str}.size());
+    for (auto {target_name} : {iter_str}) {{
+        if ({' && '.join(self._translate_expression(if_clause, local_vars) for if_clause in generator.ifs)}) {{
+            result.push_back({element_str});
+        }}
+    }}
+    return result;
+}}()"""
+        else:
+            comprehension_code = f"""[&]() {{
+    std::vector<auto> result;
+    result.reserve({iter_str}.size());
+    for (auto {target_name} : {iter_str}) {{
+        result.push_back({element_str});
+    }}
+    return result;
+}}()"""
+        
+        return comprehension_code
+    
+    def _translate_dict_comprehension(self, node: ast.DictComp, local_vars: Dict[str, str]) -> str:
+        """Translate dictionary comprehension to C++ lambda with performance optimizations."""
+        # Get the comprehension parts
+        key_expr = node.key
+        value_expr = node.value
+        generator = node.generators[0]  # For simplicity, handle only one generator
+        target = generator.target
+        iter_expr = generator.iter
+        
+        # Translate components
+        iter_str = self._translate_expression(iter_expr, local_vars)
+        target_name = target.id if isinstance(target, ast.Name) else "item"
+        key_str = self._translate_expression(key_expr, local_vars)
+        value_str = self._translate_expression(value_expr, local_vars)
+        
+        # Handle conditional comprehensions (if clauses)
+        condition_str = ""
+        if generator.ifs:
+            conditions = []
+            for if_clause in generator.ifs:
+                condition = self._translate_expression(if_clause, local_vars)
+                conditions.append(condition)
+            condition_str = f" if ({' && '.join(conditions)})"
+        
+        # Create lambda expression for the dictionary comprehension with performance optimizations
+        # Use std::unordered_map instead of std::map for O(1) vs O(log n) performance
+        # {key: value for item in iterable} becomes:
+        # [&]() { 
+        #   std::unordered_map<auto, auto> result; 
+        #   for (auto item : iterable) { 
+        #     if (condition) {  // Only if conditions exist
+        #       result[key] = value; 
+        #     }
+        #   } 
+        #   return result; 
+        # }()
+        
+        if condition_str:
+            comprehension_code = f"""[&]() {{
+    std::unordered_map<auto, auto> result;
+    for (auto {target_name} : {iter_str}) {{
+        if ({' && '.join(self._translate_expression(if_clause, local_vars) for if_clause in generator.ifs)}) {{
+            result[{key_str}] = {value_str};
+        }}
+    }}
+    return result;
+}}()"""
+        else:
+            comprehension_code = f"""[&]() {{
+    std::unordered_map<auto, auto> result;
+    for (auto {target_name} : {iter_str}) {{
+        result[{key_str}] = {value_str};
+    }}
+    return result;
+}}()"""
+        
+        return comprehension_code
     
     def _expression_uses_variables(self, expr: ast.AST, variable_names: List[str]) -> bool:
         """Check if an expression uses any of the given variable names."""

@@ -11,10 +11,14 @@ class TypeInferenceAnalyzer:
     
     def __init__(self):
         self.type_info: Dict[str, Any] = {}
+        # Add expression type cache
+        self.expression_cache: Dict[str, str] = {}
     
     def analyze_types(self, tree: ast.AST) -> Dict[str, Any]:
         """Analyze types in the AST and return type information."""
         self.type_info.clear()
+        # Clear cache at the start of analysis
+        self.expression_cache.clear()
         
         for node in ast.walk(tree):
             if isinstance(node, ast.Assign):
@@ -97,14 +101,23 @@ class TypeInferenceAnalyzer:
             return type_map.get(annotation.id)
         elif isinstance(annotation, ast.Subscript):
             if isinstance(annotation.value, ast.Name):
-                if annotation.value.id == 'List':
+                if annotation.value.id in ['List', 'list']:
                     element_type = self._annotation_to_cpp_type(annotation.slice)
                     return f'std::vector<{element_type or "int"}>'
-                elif annotation.value.id == 'Dict':
+                elif annotation.value.id in ['Dict', 'dict']:
                     if isinstance(annotation.slice, ast.Tuple) and len(annotation.slice.elts) == 2:
                         key_type = self._annotation_to_cpp_type(annotation.slice.elts[0])
                         value_type = self._annotation_to_cpp_type(annotation.slice.elts[1])
-                        return f'std::map<{key_type or "std::string"}, {value_type or "int"}>'
+                        return f'std::unordered_map<{key_type or "std::string"}, {value_type or "int"}>'
+                elif annotation.value.id in ['Tuple', 'tuple']:
+                    if isinstance(annotation.slice, ast.Tuple):
+                        types = []
+                        for elt in annotation.slice.elts:
+                            cpp_type = self._annotation_to_cpp_type(elt)
+                            if cpp_type:
+                                types.append(cpp_type)
+                        if types:
+                            return f'std::tuple<{", ".join(types)}>'
                 elif annotation.value.id == 'Optional':
                     inner_type = self._annotation_to_cpp_type(annotation.slice)
                     return f'std::optional<{inner_type or "int"}>'
@@ -121,49 +134,77 @@ class TypeInferenceAnalyzer:
         return None
     
     def _infer_expression_type(self, expr: ast.AST) -> Optional[str]:
-        """Infer the type of an expression."""
+        """Infer the type of an expression with caching."""
+        # Create a cache key based on the AST dump
+        cache_key = ast.dump(expr)
+        
+        # Check if we already cached this expression's type
+        if cache_key in self.expression_cache:
+            return self.expression_cache[cache_key]
+        
+        # Infer the type
+        result = None
         if isinstance(expr, ast.Constant):
-            if isinstance(expr.value, int):
-                return 'int'
+            # Check bool first since bool is a subclass of int in Python
+            if isinstance(expr.value, bool):
+                result = 'bool'
+            elif isinstance(expr.value, int):
+                result = 'int'
             elif isinstance(expr.value, float):
-                return 'double'
+                result = 'double'
             elif isinstance(expr.value, str):
-                return 'std::string'
-            elif isinstance(expr.value, bool):
-                return 'bool'
+                result = 'std::string'
         elif isinstance(expr, ast.List):
             if expr.elts:
                 element_type = self._infer_expression_type(expr.elts[0])
-                return f'std::vector<{element_type or "int"}>'
-            return 'std::vector<int>'
+                result = f'std::vector<{element_type or "int"}>'
+            else:
+                result = 'std::vector<int>'
         elif isinstance(expr, ast.Dict):
             if expr.keys and expr.values:
                 key_type = self._infer_expression_type(expr.keys[0]) 
                 value_type = self._infer_expression_type(expr.values[0])
-                return f'std::map<{key_type or "std::string"}, {value_type or "int"}>'
-            return 'std::map<std::string, int>'
+                # Use std::unordered_map for better performance (O(1) vs O(log n))
+                result = f'std::unordered_map<{key_type or "std::string"}, {value_type or "int"}>'
+            else:
+                result = 'std::unordered_map<std::string, int>'
         elif isinstance(expr, ast.Set):
             if expr.elts:
                 element_type = self._infer_expression_type(expr.elts[0])
-                return f'std::set<{element_type or "int"}>'
-            return 'std::set<int>'
+                result = f'std::set<{element_type or "int"}>'
+            else:
+                result = 'std::set<int>'
         elif isinstance(expr, ast.Name):
             # Look up the variable type if we know it
-            return self.type_info.get(expr.id, 'auto')
+            result = self.type_info.get(expr.id, 'auto')
         elif isinstance(expr, ast.Call):
             # Function call - could be improved with function analysis
-            return 'auto'
+            result = 'auto'
         elif isinstance(expr, ast.BinOp):
             # Binary operation - infer from operands
             left_type = self._infer_expression_type(expr.left)
             right_type = self._infer_expression_type(expr.right)
             if left_type == 'double' or right_type == 'double':
-                return 'double'
+                result = 'double'
             elif left_type == 'int' and right_type == 'int':
-                return 'int'
-            return 'auto'
+                result = 'int'
+            else:
+                result = 'auto'
+        elif isinstance(expr, ast.ListComp):
+            # List comprehension - infer from element type
+            element_type = self._infer_expression_type(expr.elt)
+            result = f'std::vector<{element_type or "auto"}>'
+        elif isinstance(expr, ast.DictComp):
+            # Dictionary comprehension - infer from key and value types
+            key_type = self._infer_expression_type(expr.key)
+            value_type = self._infer_expression_type(expr.value)
+            result = f'std::unordered_map<{key_type or "auto"}, {value_type or "auto"}>'
         
-        return None
+        # Cache the result if we found one
+        if result is not None:
+            self.expression_cache[cache_key] = result
+        
+        return result
     
     def _analyze_function_types(self, node: ast.FunctionDef) -> None:
         """Analyze function parameter and return types."""
@@ -191,4 +232,4 @@ class TypeInferenceAnalyzer:
             if return_type:
                 func_info['return_type'] = return_type
         
-        self.type_info[f'function_{node.name}'] = func_info
+        self.type_info[node.name] = func_info
