@@ -133,7 +133,7 @@ namespace pytocpp {
 
 """
         # Add function implementations using analyzed type information
-        for func_name, func_info in getattr(analysis_result, 'type_info', {}).items():
+        for func_name, func_info in analysis_result.type_info.items():
             if isinstance(func_info, dict) and func_name.startswith('calculate_'):
                 impl += self._generate_function_impl(func_name, func_info)
 
