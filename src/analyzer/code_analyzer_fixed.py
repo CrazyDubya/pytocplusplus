@@ -526,7 +526,6 @@ class CodeAnalyzer:
             # If string + string, result is string
             elif left_type == 'std::string' and right_type == 'std::string':
                 result = 'std::string'
-            # If string + string, result is string
             else:
                 result = 'int'
         elif isinstance(node, ast.UnaryOp):
