@@ -104,7 +104,7 @@ namespace pytocpp {
 
 """
         # Add function declarations using analyzed type information
-        for func_name, func_info in getattr(analysis_result, 'type_info', {}).items():
+        for func_name, func_info in analysis_result.type_info.items():
             if isinstance(func_info, dict) and func_name.startswith('calculate_'):
                 # Get return type
                 return_type = func_info.get('return_type', 'int')
