@@ -310,6 +310,24 @@ def complex_function(x):
             values=[ast.Constant(value=True), ast.Constant(value=False)]
         )
         assert analyzer._infer_expression_type(bool_op) == 'bool'
+
+    def test_set_comprehension_inference(self):
+        """Ensure set comprehensions are inferred as std::set."""
+        analyzer = CodeAnalyzer()
+
+        comp = ast.SetComp(
+            elt=ast.Name(id='x', ctx=ast.Load()),
+            generators=[
+                ast.comprehension(
+                    target=ast.Name(id='x', ctx=ast.Store()),
+                    iter=ast.Call(func=ast.Name(id='range', ctx=ast.Load()), args=[ast.Constant(value=5)], keywords=[]),
+                    ifs=[],
+                    is_async=0
+                )
+            ]
+        )
+
+        assert analyzer._infer_expression_type(comp) == 'std::set<int>'
     
     def test_type_annotation_handling(self):
         """Test handling of Python type annotations."""
