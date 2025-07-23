@@ -1062,7 +1062,7 @@ namespace pytocpp {
                 
                 args = [self._translate_expression(arg, local_vars) for arg in node.args]
                 # Map math module functions to std:: equivalents
-                if obj == 'math' and method in ['sqrt', 'sin', 'cos']:
+                if obj == 'math' and method in self.MATH_FUNCTIONS:
                     return f"std::{method}({', '.join(args)})"
                 return f"{obj}.{method}({', '.join(args)})"
             else:
