@@ -1120,7 +1120,7 @@ namespace pytocpp {
                 "[&]() {",
                 f"    std::set<{elem_type}> _set;",
                 f"    for (auto {target} : {iter_expr}) {{",
-                f"        {conditions}_set.insert({element_expr});",
+                f"        {conditions} _set.insert({element_expr});",
                 "    }",
                 "    return _set;",
                 "}()",
