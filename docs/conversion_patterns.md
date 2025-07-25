@@ -305,6 +305,8 @@ with open("file.txt") as f:
 | Python | C++ |
 |--------|-----|
 | `math.sqrt(x)` | `std::sqrt(x)` |
+| `math.sin(x)` | `std::sin(x)` |
+| `math.cos(x)` | `std::cos(x)` |
 | `random.random()` | `std::uniform_real_distribution<double>(0.0, 1.0)(generator)` |
 | `len(container)` | `container.size()` |
 | `min(a, b)` | `std::min(a, b)` |

@@ -159,6 +159,7 @@ Currently, PyToC++ effectively handles:
 - **Method overriding** and polymorphism
 - **Constructor translation** with proper initialization
 
+- **Math function translation**: `math.sqrt`, `math.sin`, and `math.cos` are translated to their C++ `std` equivalents.
 More complex features are under development, including:
 - Exception handling
 - Standard library mapping
