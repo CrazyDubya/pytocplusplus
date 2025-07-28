@@ -13,6 +13,9 @@ logger = logging.getLogger("CodeGenerator")
 class CodeGenerator:
     """Generates C++ code from Python code analysis results."""
     
+    # Define math functions that should be translated to std:: equivalents
+    MATH_FUNCTIONS = ['sqrt', 'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'exp', 'log', 'log10', 'pow', 'abs']
+    
     def __init__(self, rule_manager: RuleManager):
         self.rule_manager = rule_manager
         self.generated_code: Dict[str, str] = {}

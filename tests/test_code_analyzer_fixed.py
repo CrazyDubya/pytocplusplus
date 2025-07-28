@@ -3,7 +3,7 @@ from pathlib import Path
 import ast
 import tempfile
 import os
-from src.analyzer.code_analyzer_fixed import CodeAnalyzer, AnalysisResult
+from src.analyzer.code_analyzer import CodeAnalyzer, AnalysisResult
 
 class TestCodeAnalyzer:
     
@@ -327,7 +327,14 @@ def complex_function(x):
             ]
         )
 
-        assert analyzer._infer_expression_type(comp) == 'std::set<int>'
+        # Debug print
+        result = analyzer._infer_expression_type(comp)
+        print(f"Set comprehension type: {result}")
+        print(f"Generator iter type: {type(comp.generators[0].iter)}")
+        print(f"Generator iter func type: {type(comp.generators[0].iter.func)}")
+        print(f"Generator iter func id: {comp.generators[0].iter.func.id}")
+        
+        assert result == 'std::set<int>'
     
     def test_type_annotation_handling(self):
         """Test handling of Python type annotations."""
