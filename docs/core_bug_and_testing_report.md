@@ -16,7 +16,7 @@ a, b = 0, 1  # This causes: AttributeError: 'Tuple' object has no attribute 'id'
 
 This error prevents the tool from processing any Python code with tuple assignments—a common pattern in Python. Since the Fibonacci example uses tuple unpacking, the tool fails to analyze even the simplest example provided.
 
-The bug occurs in `src/analyzer/code_analyzer.py` in the `_infer_variable_type` method when handling tuple assignments. The code attempts to access an 'id' attribute on an AST.Tuple node, which doesn't exist:
+The bug occurred in the now-deprecated `src/analyzer/code_analyzer.py` in the `_infer_variable_type` method when handling tuple assignments. The code attempted to access an 'id' attribute on an AST.Tuple node, which doesn't exist:
 
 ```python
 self.type_info[node.targets[0].id] = f'std::tuple<{", ".join(elt_types)}>'
