@@ -74,10 +74,11 @@ class PerformanceAnalyzer:
         if isinstance(node, (ast.For, ast.While)):
             # Check for nested loops
             nested_loops = self._count_nested_loops(node)
-            if nested_loops > 2:
+            if nested_loops > 1:  # Detect nested loops (2+ levels)
                 line = getattr(node, 'lineno', 0)
                 self.performance_bottlenecks.append({
                     'type': 'nested_loops',
+                    'description': f'Nested loop detected with {nested_loops} levels of nesting',
                     'nesting_level': nested_loops,
                     'line': line,
                     'suggestion': 'Consider algorithm optimization to reduce nesting'
@@ -87,12 +88,27 @@ class PerformanceAnalyzer:
             expensive_ops = self._find_expensive_operations_in_loop(node)
             if expensive_ops:
                 line = getattr(node, 'lineno', 0)
-                self.performance_bottlenecks.append({
-                    'type': 'expensive_loop_operations',
-                    'operations': expensive_ops,
-                    'line': line,
-                    'suggestion': 'Move expensive operations outside the loop when possible'
-                })
+
+                # Check specifically for container modifications
+                container_ops = [op for op in expensive_ops if op in ['append', 'extend', 'insert']]
+                if container_ops:
+                    self.performance_bottlenecks.append({
+                        'type': 'container_modification',
+                        'description': f'Container modification in loop: {", ".join(container_ops)}',
+                        'operations': container_ops,
+                        'line': line,
+                        'suggestion': 'Consider pre-allocating containers or using list comprehensions'
+                    })
+
+                # Check for other expensive operations
+                other_ops = [op for op in expensive_ops if op not in ['append', 'extend', 'insert']]
+                if other_ops:
+                    self.performance_bottlenecks.append({
+                        'type': 'expensive_loop_operations',
+                        'operations': other_ops,
+                        'line': line,
+                        'suggestion': 'Move expensive operations outside the loop when possible'
+                    })
     
     def _analyze_comprehension_performance(self, node: ast.ListComp) -> None:
         """Analyze list comprehension performance."""

@@ -154,6 +154,8 @@ class TypeInferenceAnalyzer:
                 result = 'double'
             elif isinstance(expr.value, str):
                 result = 'std::string'
+            elif expr.value is None:
+                result = 'std::nullptr_t'
         elif isinstance(expr, ast.List):
             if expr.elts:
                 element_type = self._infer_expression_type(expr.elts[0])
@@ -190,6 +192,12 @@ class TypeInferenceAnalyzer:
                 result = 'int'
             else:
                 result = 'auto'
+        elif isinstance(expr, ast.Compare):
+            # Comparison operations always return bool
+            result = 'bool'
+        elif isinstance(expr, ast.BoolOp):
+            # Boolean operations (and, or) always return bool
+            result = 'bool'
         elif isinstance(expr, ast.ListComp):
             # List comprehension - infer from element type
             element_type = self._infer_expression_type(expr.elt)
@@ -231,5 +239,17 @@ class TypeInferenceAnalyzer:
             return_type = self._annotation_to_cpp_type(node.returns)
             if return_type:
                 func_info['return_type'] = return_type
+        else:
+            # Try to infer return type from return statements
+            inferred_return_type = self._infer_return_type_from_body(node.body)
+            if inferred_return_type:
+                func_info['return_type'] = inferred_return_type
         
         self.type_info[node.name] = func_info
+
+    def _infer_return_type_from_body(self, body: List[ast.stmt]) -> Optional[str]:
+        """Infer return type by analyzing return statements in function body."""
+        for node in ast.walk(ast.Module(body=body, type_ignores=[])):
+            if isinstance(node, ast.Return) and node.value:
+                return self._infer_expression_type(node.value)
+        return None

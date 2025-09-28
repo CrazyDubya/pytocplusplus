@@ -119,10 +119,29 @@ class CodeAnalyzer:
     def _infer_expression_type(self, expr: ast.AST) -> str:
         """Backward compatibility method for tests."""
         return self.type_analyzer._infer_expression_type(expr) or 'auto'
-    
+
     def _get_type_name(self, node: ast.AST) -> str:
         """Backward compatibility method for tests."""
         return self.type_analyzer._annotation_to_cpp_type(node) or 'auto'
+
+    def _infer_variable_type(self, node: ast.Assign) -> None:
+        """Backward compatibility method for tests."""
+        self.type_analyzer._infer_variable_type(node)
+        # Update local type_info from the analyzer
+        for var_name, var_type in self.type_analyzer.type_info.items():
+            if isinstance(var_type, str):  # Only copy simple type strings
+                if not hasattr(self, 'type_info'):
+                    self.type_info = {}
+                self.type_info[var_name] = var_type
+
+    def _infer_function_types(self, node: ast.FunctionDef) -> None:
+        """Backward compatibility method for tests."""
+        self.type_analyzer._analyze_function_types(node)
+        # Update local type_info from the analyzer
+        for var_name, var_type in self.type_analyzer.type_info.items():
+            if not hasattr(self, 'type_info'):
+                self.type_info = {}
+            self.type_info[var_name] = var_type
     
     def _find_containing_function_or_class(self, target_node: ast.AST, tree: ast.AST) -> Optional[str]:
         """Find the function or class containing a given node."""
