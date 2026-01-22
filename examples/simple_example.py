@@ -8,7 +8,7 @@ def calculate_fibonacci(n: int) -> int:
         a, b = b, a + b
     return b
 
-def main():
+def main() -> None:
     # Test the Fibonacci calculation
     numbers = [5, 10, 15]
     results = []

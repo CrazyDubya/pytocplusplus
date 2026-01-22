@@ -1,7 +1,8 @@
 import ast
 import sys
+from typing import Any
 
-def print_ast(node, level=0):
+def print_ast(node: ast.AST, level: int = 0) -> None:
     indent = "  " * level
     print(f"{indent}{type(node).__name__}")
     for field, value in ast.iter_fields(node):
@@ -18,7 +19,7 @@ def print_ast(node, level=0):
         else:
             print(f"{indent}  {field}: {value}")
 
-def print_type_info(node, level=0):
+def print_type_info(node: ast.AST, level: int = 0) -> None:
     indent = "  " * level
     if isinstance(node, ast.FunctionDef):
         print(f"{indent}Function: {node.name}")
