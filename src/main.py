@@ -2,6 +2,7 @@ import argparse
 import sys
 import logging
 from pathlib import Path
+from typing import Tuple
 
 # Fix imports to work with both module and script execution
 try:
@@ -43,7 +44,7 @@ def setup_argument_parser() -> argparse.ArgumentParser:
                       help="Enable verbose output")
     return parser
 
-def initialize_components():
+def initialize_components() -> Tuple:
     """Initialize and return all necessary components."""
     try:
         analyzer = CodeAnalyzer()
@@ -59,7 +60,7 @@ def initialize_components():
         logger.error(f"Error initializing components: {e}")
         sys.exit(1)
 
-def analyze_python_code(analyzer: CodeAnalyzer, input_path: Path):
+def analyze_python_code(analyzer, input_path: Path):
     """Analyze Python code and return results."""
     try:
         logger.info(f"Analyzing Python code: {input_path}")
@@ -77,7 +78,7 @@ def analyze_python_code(analyzer: CodeAnalyzer, input_path: Path):
         logger.error(f"Error analyzing Python code: {e}")
         sys.exit(1)
 
-def generate_cpp_code(generator: CodeGenerator, analysis_result, output_dir: Path):
+def generate_cpp_code(generator, analysis_result, output_dir: Path) -> None:
     """Generate C++ code from analysis results."""
     try:
         logger.info(f"Generating C++ code in: {output_dir}")
@@ -93,7 +94,7 @@ def generate_cpp_code(generator: CodeGenerator, analysis_result, output_dir: Pat
         logger.error(f"Error generating C++ code: {e}")
         sys.exit(1)
 
-def main():
+def main() -> None:
     # Parse arguments
     parser = setup_argument_parser()
     args = parser.parse_args()

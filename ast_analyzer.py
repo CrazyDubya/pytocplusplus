@@ -1,8 +1,9 @@
 import ast
 import astunparse
 import sys
+from typing import Any
 
-def analyze_function_ast(file_path, function_name):
+def analyze_function_ast(file_path: str, function_name: str) -> bool:
     # Read the Python file
     with open(file_path, 'r') as file:
         source_code = file.read()

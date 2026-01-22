@@ -1,8 +1,9 @@
 import ast
 import sys
 from pathlib import Path
+from typing import Any
 
-def print_ast_node(node, indent=0):
+def print_ast_node(node: ast.AST, indent: int = 0) -> None:
     """Print an AST node with indentation."""
     node_type = type(node).__name__
     print(' ' * indent + f"{node_type}", end='')
@@ -27,7 +28,7 @@ def print_ast_node(node, indent=0):
             print(' ' * (indent + 2) + f"{field_name}:")
             print_ast_node(field_value, indent + 4)
 
-def analyze_file(file_path):
+def analyze_file(file_path: str) -> None:
     """Analyze a Python file's AST."""
     with open(file_path, 'r') as f:
         content = f.read()

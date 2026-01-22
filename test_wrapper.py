@@ -21,7 +21,7 @@ def python_fibonacci(n: int) -> int:
         a, b = b, a + b
     return b
 
-def test_fibonacci():
+def test_fibonacci() -> None:
     # Test with Python implementation
     print("\nTesting Python implementation:")
     for n in [5, 10, 15]:
